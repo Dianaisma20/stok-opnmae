@@ -1,10 +1,15 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+// Import file konfigurasi firebase kamu di sini jika ada:
+// import 'firebase_options.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    // options: DefaultFirebaseOptions.currentPlatform, // Aktifkan jika menggunakan flutterfire configure
+  );
   runApp(
     const MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -14,15 +19,7 @@ void main() {
 }
 
 // ========================================================
-// 🌐 KONFIGURASI API
-// ========================================================
-
-// IP laptop yang menjalankan server Node.js.
-// Pastikan IP ini sama dengan IP laptop/server kamu.
-const String URL_BASE_API = "localhost:8000";
-
-// ========================================================
-// 🔐 INTERFACE 1: HALAMAN LOGIN
+// 🔐 INTERFACE 1: HALAMAN LOGIN (FIRESTORE)
 // ========================================================
 
 class HalamanLogin extends StatefulWidget {
@@ -38,52 +35,32 @@ class _HalamanLoginState extends State<HalamanLogin> {
 
   bool _sedangMemuat = false;
 
-  // ======================================================
-  // PROSES LOGIN
-  // ======================================================
-
   Future<void> aksiLogin() async {
-    if (_emailCtrl.text.trim().isEmpty ||
-        _passCtrl.text.trim().isEmpty) {
+    final email = _emailCtrl.text.trim();
+    final password = _passCtrl.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Email & Password wajib diisi!"),
-        ),
+        const SnackBar(content: Text("Email & Password wajib diisi!")),
       );
       return;
     }
 
-    setState(() {
-      _sedangMemuat = true;
-    });
-
-    final url = Uri.parse(
-      'http://$URL_BASE_API/api/login',
-    );
+    setState(() => _sedangMemuat = true);
 
     try {
-      final respon = await http.post(
-        url,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: jsonEncode({
-          "email": _emailCtrl.text.trim(),
-          "password": _passCtrl.text,
-        }),
-      );
+      // Mengambil data user langsung dari koleksi Firestore "users"
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('email', isEqualTo: email)
+          .where('password', isEqualTo: password)
+          .limit(1)
+          .get();
 
-      final hasil = jsonDecode(respon.body);
-
-      if (respon.statusCode == 200) {
-        final dataUser = hasil['data'];
-
-        final String roleUser = dataUser['role'];
-        final String namaUser = dataUser['nama'];
-
-        // =================================================
-        // NAVIGASI BERDASARKAN ROLE
-        // =================================================
+      if (querySnapshot.docs.isNotEmpty) {
+        final dataUser = querySnapshot.docs.first.data();
+        final String roleUser = dataUser['role'] ?? '';
+        final String namaUser = dataUser['nama'] ?? 'Pengguna';
 
         if (!mounted) return;
 
@@ -91,60 +68,41 @@ class _HalamanLoginState extends State<HalamanLogin> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) => HalamanDashboardAdmin(
-                nama: namaUser,
-              ),
+              builder: (_) => HalamanDashboardAdmin(nama: namaUser),
             ),
           );
         } else if (roleUser == 'petugas') {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) => HalamanDashboardPetugas(
-                nama: namaUser,
-              ),
+              builder: (_) => HalamanDashboardPetugas(nama: namaUser),
             ),
           );
         } else if (roleUser == 'kadin') {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) => HalamanDashboardKadin(
-                nama: namaUser,
-              ),
+              builder: (_) => HalamanDashboardKadin(nama: namaUser),
             ),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Role pengguna tidak dikenali!"),
-            ),
+            const SnackBar(content: Text("Role pengguna tidak dikenali!")),
           );
         }
       } else {
-        final String pesan =
-            hasil['message'] ?? "Login gagal! Periksa kembali akun Anda.";
-
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(pesan),
-          ),
+          const SnackBar(content: Text("Email atau password salah!")),
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "Gagal terhubung ke server Backend Node.js!",
-          ),
-        ),
+        SnackBar(content: Text("Gagal terhubung ke Firestore: $e")),
       );
     } finally {
-      if (mounted) {
-        setState(() {
-          _sedangMemuat = false;
-        });
-      }
+      if (mounted) setState(() => _sedangMemuat = false);
     }
   }
 
@@ -154,10 +112,6 @@ class _HalamanLoginState extends State<HalamanLogin> {
     _passCtrl.dispose();
     super.dispose();
   }
-
-  // ======================================================
-  // TAMPILAN LOGIN
-  // ======================================================
 
   @override
   Widget build(BuildContext context) {
@@ -169,14 +123,8 @@ class _HalamanLoginState extends State<HalamanLogin> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
-                Icons.domain,
-                size: 80,
-                color: Colors.blue,
-              ),
-
+              const Icon(Icons.domain, size: 80, color: Colors.blue),
               const SizedBox(height: 10),
-
               const Text(
                 "DISKOMINFO OPNAME",
                 style: TextStyle(
@@ -185,20 +133,13 @@ class _HalamanLoginState extends State<HalamanLogin> {
                   color: Colors.blue,
                 ),
               ),
-
               const SizedBox(height: 5),
-
               const Text(
                 "Sistem Validasi Stok Barang Aset Daerah",
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.grey,
-                ),
+                style: TextStyle(color: Colors.grey),
               ),
-
               const SizedBox(height: 40),
-
-              // EMAIL
               TextField(
                 controller: _emailCtrl,
                 keyboardType: TextInputType.emailAddress,
@@ -208,10 +149,7 @@ class _HalamanLoginState extends State<HalamanLogin> {
                   border: OutlineInputBorder(),
                 ),
               ),
-
               const SizedBox(height: 20),
-
-              // PASSWORD
               TextField(
                 controller: _passCtrl,
                 obscureText: true,
@@ -221,10 +159,7 @@ class _HalamanLoginState extends State<HalamanLogin> {
                   border: OutlineInputBorder(),
                 ),
               ),
-
               const SizedBox(height: 30),
-
-              // TOMBOL LOGIN
               SizedBox(
                 width: double.infinity,
                 height: 50,
@@ -245,9 +180,7 @@ class _HalamanLoginState extends State<HalamanLogin> {
                         )
                       : const Text(
                           "MASUK APLIKASI",
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: TextStyle(fontWeight: FontWeight.bold),
                         ),
                 ),
               ),
@@ -265,11 +198,7 @@ class _HalamanLoginState extends State<HalamanLogin> {
 
 class HalamanDashboardAdmin extends StatelessWidget {
   final String nama;
-
-  const HalamanDashboardAdmin({
-    super.key,
-    required this.nama,
-  });
+  const HalamanDashboardAdmin({super.key, required this.nama});
 
   @override
   Widget build(BuildContext context) {
@@ -283,15 +212,12 @@ class HalamanDashboardAdmin extends StatelessWidget {
             onPressed: () {
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const HalamanLogin(),
-                ),
+                MaterialPageRoute(builder: (_) => const HalamanLogin()),
               );
             },
           ),
         ],
       ),
-
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -299,83 +225,49 @@ class HalamanDashboardAdmin extends StatelessWidget {
           children: [
             Text(
               "Selamat Datang, $nama",
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
-
             const SizedBox(height: 5),
-
-            const Text(
-              "Hak Akses: Pengelola Master Data",
-            ),
-
+            const Text("Hak Akses: Pengelola Master Data"),
             const SizedBox(height: 30),
-
             Expanded(
               child: GridView.count(
                 crossAxisCount: 2,
                 crossAxisSpacing: 10,
                 mainAxisSpacing: 10,
                 children: [
-                  // INPUT BARANG
                   Card(
                     color: Colors.amber.shade100,
                     child: InkWell(
                       onTap: () {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              "Menu Input Barang Baru",
-                            ),
-                          ),
+                          const SnackBar(content: Text("Menu Input Barang Baru")),
                         );
                       },
                       child: const Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            Icons.add_box,
-                            size: 50,
-                            color: Colors.amber,
-                          ),
+                          Icon(Icons.add_box, size: 50, color: Colors.amber),
                           SizedBox(height: 10),
-                          Text(
-                            "Input Barang Baru",
-                            textAlign: TextAlign.center,
-                          ),
+                          Text("Input Barang Baru", textAlign: TextAlign.center),
                         ],
                       ),
                     ),
                   ),
-
-                  // KELOLA STOK
                   Card(
                     color: Colors.amber.shade100,
                     child: InkWell(
                       onTap: () {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              "Menu Kelola Stok Awal",
-                            ),
-                          ),
+                          const SnackBar(content: Text("Menu Kelola Stok Awal")),
                         );
                       },
                       child: const Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            Icons.inventory,
-                            size: 50,
-                            color: Colors.amber,
-                          ),
+                          Icon(Icons.inventory, size: 50, color: Colors.amber),
                           SizedBox(height: 10),
-                          Text(
-                            "Kelola Stok Awal",
-                            textAlign: TextAlign.center,
-                          ),
+                          Text("Kelola Stok Awal", textAlign: TextAlign.center),
                         ],
                       ),
                     ),
@@ -391,127 +283,75 @@ class HalamanDashboardAdmin extends StatelessWidget {
 }
 
 // ========================================================
-// 📦 INTERFACE 3: DASHBOARD PETUGAS GUDANG
+// 📦 INTERFACE 3: DASHBOARD PETUGAS GUDANG (FIRESTORE)
 // ========================================================
 
 class HalamanDashboardPetugas extends StatefulWidget {
   final String nama;
-
-  const HalamanDashboardPetugas({
-    super.key,
-    required this.nama,
-  });
+  const HalamanDashboardPetugas({super.key, required this.nama});
 
   @override
   State<HalamanDashboardPetugas> createState() =>
       _HalamanDashboardPetugasState();
 }
 
-class _HalamanDashboardPetugasState
-    extends State<HalamanDashboardPetugas> {
-
-  final MobileScannerController kameraController =
-      MobileScannerController();
-
+class _HalamanDashboardPetugasState extends State<HalamanDashboardPetugas> {
+  final MobileScannerController kameraController = MobileScannerController();
   bool _sedangMemproses = false;
-
-  // ======================================================
-  // MENCARI BARANG BERDASARKAN BARCODE / QR
-  // ======================================================
 
   Future<void> prosesCariBarang(String kode) async {
     if (_sedangMemproses) return;
 
-    setState(() {
-      _sedangMemproses = true;
-    });
-
+    setState(() => _sedangMemproses = true);
     await kameraController.stop();
 
-    final url = Uri.parse(
-      'http://$URL_BASE_API/api/barang/cari?kode=$kode',
-    );
-
     try {
-      final respon = await http.get(url);
+      final docSnapshot = await FirebaseFirestore.instance
+          .collection('barang')
+          .doc(kode)
+          .get();
 
-      if (respon.statusCode == 200) {
-        final hasil = jsonDecode(respon.body);
-
-        final dataBarang = hasil['data'];
+      if (docSnapshot.exists) {
+        final dataBarang = docSnapshot.data()!;
+        dataBarang['kode_barang'] = kode;
 
         if (!mounted) return;
-
         bukaDialogInputFisik(dataBarang);
       } else {
         if (!mounted) return;
-
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              "Barang dengan kode $kode tidak terdaftar!",
-            ),
-          ),
+          SnackBar(content: Text("Barang dengan kode $kode tidak terdaftar!")),
         );
-
         await kameraController.start();
       }
     } catch (e) {
       if (!mounted) return;
-
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "Koneksi bermasalah ke server Node.js.",
-          ),
-        ),
+        SnackBar(content: Text("Gagal mengambil data dari Firestore: $e")),
       );
-
       await kameraController.start();
     } finally {
-      if (mounted) {
-        setState(() {
-          _sedangMemproses = false;
-        });
-      }
+      if (mounted) setState(() => _sedangMemproses = false);
     }
   }
 
-  // ======================================================
-  // DIALOG INPUT STOK FISIK
-  // ======================================================
-
-  void bukaDialogInputFisik(
-    Map<String, dynamic> barang,
-  ) {
-    final TextEditingController inputFisikController =
-        TextEditingController();
+  void bukaDialogInputFisik(Map<String, dynamic> barang) {
+    final TextEditingController inputFisikController = TextEditingController();
 
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
         return AlertDialog(
-          title: Text(
-            barang['nama_barang'] ?? "Barang",
-          ),
-
+          title: Text(barang['nama_barang'] ?? "Barang"),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                "Kode Barang: ${barang['kode_barang']}",
-              ),
-
+              Text("Kode Barang: ${barang['kode_barang']}"),
               const SizedBox(height: 8),
-
-              Text(
-                "Stok Buku Sistem: ${barang['stok_sistem']}",
-              ),
-
+              Text("Stok Buku Sistem: ${barang['stok_sistem']}"),
               const SizedBox(height: 15),
-
               TextField(
                 controller: inputFisikController,
                 keyboardType: TextInputType.number,
@@ -523,9 +363,7 @@ class _HalamanDashboardPetugasState
               ),
             ],
           ),
-
           actions: [
-            // BATAL
             TextButton(
               onPressed: () {
                 Navigator.pop(dialogContext);
@@ -533,43 +371,28 @@ class _HalamanDashboardPetugasState
               },
               child: const Text("Batal"),
             ),
-
-            // SIMPAN
             ElevatedButton(
               onPressed: () {
-                if (inputFisikController.text.trim().isEmpty) {
+                final text = inputFisikController.text.trim();
+                if (text.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        "Jumlah fisik wajib diisi!",
-                      ),
-                    ),
+                    const SnackBar(content: Text("Jumlah fisik wajib diisi!")),
                   );
                   return;
                 }
 
-                final int? stokFisik = int.tryParse(
-                  inputFisikController.text.trim(),
-                );
-
+                final int? stokFisik = int.tryParse(text);
                 if (stokFisik == null) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        "Jumlah stok harus berupa angka!",
-                      ),
-                    ),
+                    const SnackBar(content: Text("Jumlah stok harus berupa angka!")),
                   );
                   return;
                 }
 
                 Navigator.pop(dialogContext);
-
                 simpanKeDatabase(
                   barang['kode_barang'],
-                  int.parse(
-                    barang['stok_sistem'].toString(),
-                  ),
+                  int.parse(barang['stok_sistem'].toString()),
                   stokFisik,
                 );
               },
@@ -581,81 +404,35 @@ class _HalamanDashboardPetugasState
     );
   }
 
-  // ======================================================
-  // SIMPAN HASIL OPNAME
-  // ======================================================
-
-  Future<void> simpanKeDatabase(
-    String kode,
-    int stokSis,
-    int stokFis,
-  ) async {
-    final url = Uri.parse(
-      'http://$URL_BASE_API/api/opname/simpan',
-    );
-
+  Future<void> simpanKeDatabase(String kode, int stokSis, int stokFis) async {
     try {
-      final respon = await http.post(
-        url,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: jsonEncode({
-          "kode_barang": kode,
-          "stok_sistem": stokSis,
-          "stok_fisik": stokFis,
-          "petugas": widget.nama,
-        }),
+      await FirebaseFirestore.instance.collection('opname').add({
+        'kode_barang': kode,
+        'stok_sistem': stokSis,
+        'stok_fisik': stokFis,
+        'petugas': widget.nama,
+        'created_at': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Hasil opname berhasil disimpan ke Firestore!")),
       );
-
-      if (respon.statusCode == 200 ||
-          respon.statusCode == 201) {
-        if (!mounted) return;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              "Hasil opname berhasil disimpan ke MySQL!",
-            ),
-          ),
-        );
-      } else {
-        if (!mounted) return;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              "Data opname gagal disimpan.",
-            ),
-          ),
-        );
-      }
     } catch (e) {
       if (!mounted) return;
-
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "Gagal mengirim data ke server.",
-          ),
-        ),
+        SnackBar(content: Text("Gagal menyimpan data opname: $e")),
       );
     } finally {
       await kameraController.start();
     }
   }
 
-  // ======================================================
-  // TAMPILAN DASHBOARD PETUGAS
-  // ======================================================
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          "Petugas Gudang (Scanner)",
-        ),
+        title: const Text("Petugas Gudang (Scanner)"),
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
         actions: [
@@ -663,62 +440,38 @@ class _HalamanDashboardPetugasState
             icon: const Icon(Icons.logout),
             onPressed: () {
               kameraController.stop();
-
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const HalamanLogin(),
-                ),
+                MaterialPageRoute(builder: (_) => const HalamanLogin()),
               );
             },
           ),
         ],
       ),
-
       body: Stack(
         children: [
-          // =================================================
-          // KAMERA BARCODE / QR CODE
-          // =================================================
-
           MobileScanner(
             controller: kameraController,
             onDetect: (capture) {
               final barcodes = capture.barcodes;
-
               if (barcodes.isNotEmpty) {
-                final String? kode =
-                    barcodes.first.rawValue;
-
+                final String? kode = barcodes.first.rawValue;
                 if (kode != null && kode.isNotEmpty) {
                   prosesCariBarang(kode);
                 }
               }
             },
           ),
-
-          // =================================================
-          // KOTAK SCANNER
-          // =================================================
-
           Center(
             child: Container(
               width: 220,
               height: 220,
               decoration: BoxDecoration(
-                border: Border.all(
-                  color: Colors.green,
-                  width: 4,
-                ),
+                border: Border.all(color: Colors.green, width: 4),
                 borderRadius: BorderRadius.circular(15),
               ),
             ),
           ),
-
-          // =================================================
-          // INFORMASI PETUGAS
-          // =================================================
-
           Positioned(
             top: 20,
             left: 20,
@@ -739,18 +492,11 @@ class _HalamanDashboardPetugasState
               ),
             ),
           ),
-
-          // =================================================
-          // LOADING
-          // =================================================
-
           if (_sedangMemproses)
             Container(
               color: Colors.black54,
               child: const Center(
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                ),
+                child: CircularProgressIndicator(color: Colors.white),
               ),
             ),
         ],
@@ -771,19 +517,13 @@ class _HalamanDashboardPetugasState
 
 class HalamanDashboardKadin extends StatelessWidget {
   final String nama;
-
-  const HalamanDashboardKadin({
-    super.key,
-    required this.nama,
-  });
+  const HalamanDashboardKadin({super.key, required this.nama});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          "Monitoring Kadin",
-        ),
+        title: const Text("Monitoring Kadin"),
         backgroundColor: Colors.purple,
         foregroundColor: Colors.white,
         actions: [
@@ -792,47 +532,32 @@ class HalamanDashboardKadin extends StatelessWidget {
             onPressed: () {
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const HalamanLogin(),
-                ),
+                MaterialPageRoute(builder: (_) => const HalamanLogin()),
               );
             },
           ),
         ],
       ),
-
       body: Padding(
         padding: const EdgeInsets.all(25),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // NAMA KADIN
             Text(
-              "Yth. ${nama}",
+              "Yth. $nama",
               style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: Colors.purple,
               ),
             ),
-
             const SizedBox(height: 5),
-
-            const Text(
-              "Jabatan: Kepala Dinas Kominfo",
-            ),
-
+            const Text("Jabatan: Kepala Dinas Kominfo"),
             const SizedBox(height: 30),
-
-            // STATUS BARANG
-            Card(
+            const Card(
               color: Colors.purple,
-              child: const ListTile(
-                leading: Icon(
-                  Icons.assessment,
-                  color: Colors.white,
-                  size: 40,
-                ),
+              child: ListTile(
+                leading: Icon(Icons.assessment, color: Colors.white, size: 40),
                 title: Text(
                   "Status Keberadaan Barang Gudang",
                   style: TextStyle(
@@ -841,66 +566,34 @@ class HalamanDashboardKadin extends StatelessWidget {
                   ),
                 ),
                 subtitle: Text(
-                  "Semua data opname terekam realtime di database Node.js.",
-                  style: TextStyle(
-                    color: Colors.white70,
-                  ),
+                  "Semua data opname terekam realtime di Firestore.",
+                  style: TextStyle(color: Colors.white70),
                 ),
               ),
             ),
-
             const SizedBox(height: 15),
-
-            // MENU MONITORING
             Card(
               child: ListTile(
-                leading: const Icon(
-                  Icons.inventory_2,
-                  color: Colors.purple,
-                ),
-                title: const Text(
-                  "Monitoring Stok Barang",
-                ),
-                subtitle: const Text(
-                  "Melihat hasil pemeriksaan stok barang.",
-                ),
-                trailing: const Icon(
-                  Icons.arrow_forward_ios,
-                ),
+                leading: const Icon(Icons.inventory_2, color: Colors.purple),
+                title: const Text("Monitoring Stok Barang"),
+                subtitle: const Text("Melihat hasil pemeriksaan stok barang."),
+                trailing: const Icon(Icons.arrow_forward_ios),
                 onTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        "Menu monitoring stok",
-                      ),
-                    ),
+                    const SnackBar(content: Text("Menu monitoring stok")),
                   );
                 },
               ),
             ),
-
             Card(
               child: ListTile(
-                leading: const Icon(
-                  Icons.history,
-                  color: Colors.purple,
-                ),
-                title: const Text(
-                  "Riwayat Opname",
-                ),
-                subtitle: const Text(
-                  "Melihat riwayat pemeriksaan barang.",
-                ),
-                trailing: const Icon(
-                  Icons.arrow_forward_ios,
-                ),
+                leading: const Icon(Icons.history, color: Colors.purple),
+                title: const Text("Riwayat Opname"),
+                subtitle: const Text("Melihat riwayat pemeriksaan barang."),
+                trailing: const Icon(Icons.arrow_forward_ios),
                 onTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        "Menu riwayat opname",
-                      ),
-                    ),
+                    const SnackBar(content: Text("Menu riwayat opname")),
                   );
                 },
               ),
