@@ -19,14 +19,13 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions web = FirebaseOptions(
     apiKey: 'AIzaSyD8fymJp3DaXKGozJhqD_agIKZ3fxBT4',
-    authDomain: 'stok-opname-283b7.firebaseapp.com',
-    projectId: 'stok-opname-283b7',
-    storageBucket: 'stok-opname-283b7.firebasestorage.app',
+    appId: '1:773541060798:web:be1c8fff24cc969b4ffeeef',
     messagingSenderId: '773541060798',
-    appId: '1:773541060798:web:be1c8fff24cc969b4ffeef',
+    projectId: 'stok-opname-283b7',
+    authDomain: 'stok-opname-283b7.firebaseapp.com',
+    storageBucket: 'stok-opname-283b7.firebasestorage.app',
     measurementId: 'G-985VDY6XDX',
   );
-
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyD8fymJp3DaXKGozJhqD_agIKZ3fxBT4',
     authDomain: 'stok-opname-283b7.firebaseapp.com',
