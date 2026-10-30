@@ -6,9 +6,11 @@ import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await Firebase.initializeApp(
-    // options: DefaultFirebaseOptions.currentPlatform, // Aktifkan jika menggunakan flutterfire configure
+    options: DefaultFirebaseOptions.currentPlatform,
   );
+
   runApp(
     const MaterialApp(
       debugShowCheckedModeBanner: false,
