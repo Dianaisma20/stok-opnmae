@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:barcode/barcode.dart' as bc;
-import 'package:barcode_widget/barcode_widget.dart';
 
 import 'firebase_options.dart';
 
@@ -347,7 +345,7 @@ class HalamanAdmin extends StatelessWidget {
           kartuMenu(
             context: context,
             judul: 'Input Barang Baru',
-            deskripsi: 'Menambahkan barang dan membuat kode barcode otomatis.',
+            deskripsi: 'Daftarkan barang dengan memindai barcode asli pada kemasan.',
             ikon: Icons.add_box,
             warna: Colors.blue,
             aksi: () {
@@ -362,8 +360,8 @@ class HalamanAdmin extends StatelessWidget {
 
           kartuMenu(
             context: context,
-            judul: 'Data Barang dan Barcode',
-            deskripsi: 'Melihat, mengubah, menghapus, dan menampilkan barcode.',
+            judul: 'Data Barang dan Kode Barcode',
+            deskripsi: 'Melihat, mengubah, dan menghapus data barang.',
             ikon: Icons.inventory,
             warna: Colors.green,
             aksi: () {
@@ -440,8 +438,7 @@ class HalamanInputBarang extends StatefulWidget {
   const HalamanInputBarang({super.key});
 
   @override
-  State<HalamanInputBarang> createState() =>
-      _HalamanInputBarangState();
+  State<HalamanInputBarang> createState() => _HalamanInputBarangState();
 }
 
 class _HalamanInputBarangState extends State<HalamanInputBarang> {
@@ -452,45 +449,94 @@ class _HalamanInputBarangState extends State<HalamanInputBarang> {
   final stokCtrl = TextEditingController();
 
   bool loading = false;
-  bool kodeSedangDibuat = true;
+  bool sedangScan = false;
 
-  @override
-  void initState() {
-    super.initState();
-    buatKodeOtomatis();
-  }
+  // Fokus pada format barcode batang yang umum dipakai pada kemasan produk.
+  final MobileScannerController scannerController = MobileScannerController(
+    facing: CameraFacing.back,
+    detectionSpeed: DetectionSpeed.noDuplicates,
+    formats: const <BarcodeFormat>[
+      BarcodeFormat.ean13,
+      BarcodeFormat.ean8,
+      BarcodeFormat.upcA,
+      BarcodeFormat.upcE,
+      BarcodeFormat.code128,
+      BarcodeFormat.code39,
+      BarcodeFormat.code93,
+      BarcodeFormat.codabar,
+      BarcodeFormat.itf,
+    ],
+  );
 
-  Future<void> buatKodeOtomatis() async {
+  // Membuka kamera untuk membaca barcode asli pada kemasan produk.
+  Future<void> scanBarcodeProduk() async {
+    if (sedangScan) return;
+    setState(() => sedangScan = true);
+
+    bool sudahTerbaca = false;
+
     try {
-      final counterRef = db.collection('counters').doc('barang');
+      final hasilScan = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text('Pindai Barcode Produk'),
+            content: SizedBox(
+              width: 320,
+              height: 350,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: MobileScanner(
+                  controller: scannerController,
+                  onDetect: (capture) {
+                    if (sudahTerbaca) return;
 
-      final nomor = await db.runTransaction<int>((transaction) async {
-        final snapshot = await transaction.get(counterRef);
+                    // Periksa semua hasil deteksi, bukan hanya barcode pertama.
+                    for (final barcode in capture.barcodes) {
+                      final nilai = barcode.rawValue?.trim();
+                      if (nilai == null || nilai.isEmpty) continue;
 
-        final nomorLama = snapshot.exists
-            ? (snapshot.data()?['last_number'] as num?)?.toInt() ?? 0
-            : 0;
-
-        final nomorBaru = nomorLama + 1;
-
-        transaction.set(counterRef, {
-          'last_number': nomorBaru,
-        });
-
-        return nomorBaru;
-      });
+                      sudahTerbaca = true;
+                      Navigator.of(dialogContext).pop(nilai);
+                      break;
+                    }
+                  },
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Batal'),
+              ),
+            ],
+          );
+        },
+      );
 
       if (!mounted) return;
 
-      kodeCtrl.text = 'BRG${nomor.toString().padLeft(4, '0')}';
+      if (hasilScan != null && hasilScan.isNotEmpty) {
+        final ref = db.collection('barang').doc(hasilScan);
+        final cek = await ref.get();
+
+        if (!mounted) return;
+
+        if (cek.exists) {
+          pesan(context, 'Barcode $hasilScan sudah terdaftar sebagai barang.');
+          return;
+        }
+
+        setState(() {
+          kodeCtrl.text = hasilScan;
+        });
+        pesan(context, 'Barcode berhasil dibaca: $hasilScan');
+      }
     } catch (e) {
-      if (mounted) {
-        pesan(context, 'Gagal membuat kode barang: $e');
-      }
+      if (mounted) pesan(context, 'Gagal memindai barcode: $e');
     } finally {
-      if (mounted) {
-        setState(() => kodeSedangDibuat = false);
-      }
+      if (mounted) setState(() => sedangScan = false);
     }
   }
 
@@ -501,17 +547,13 @@ class _HalamanInputBarangState extends State<HalamanInputBarang> {
     final satuan = satuanCtrl.text.trim();
     final stok = int.tryParse(stokCtrl.text.trim());
 
-    if (kodeSedangDibuat || kode.isEmpty) {
-      pesan(context, 'Kode barang belum tersedia.');
+    if (kode.isEmpty) {
+      pesan(context, 'Pindai barcode produk terlebih dahulu.');
       return;
     }
 
-    if (nama.isEmpty ||
-        kategori.isEmpty ||
-        satuan.isEmpty ||
-        stok == null ||
-        stok < 0) {
-      pesan(context, 'Periksa kembali data barang.');
+    if (nama.isEmpty || kategori.isEmpty || satuan.isEmpty || stok == null || stok < 0) {
+      pesan(context, 'Periksa kembali nama, kategori, satuan, dan stok awal.');
       return;
     }
 
@@ -519,6 +561,12 @@ class _HalamanInputBarangState extends State<HalamanInputBarang> {
 
     try {
       final ref = db.collection('barang').doc(kode);
+      final cek = await ref.get();
+
+      if (cek.exists) {
+        pesan(context, 'Barcode ini sudah terdaftar. Gunakan data barang yang sudah ada.');
+        return;
+      }
 
       await ref.set({
         'kode_barang': kode,
@@ -526,34 +574,30 @@ class _HalamanInputBarangState extends State<HalamanInputBarang> {
         'kategori': kategori,
         'satuan': satuan,
         'stok_sistem': stok,
+        'jenis_barcode': 'barcode_produk_asli',
         'created_at': FieldValue.serverTimestamp(),
         'updated_at': FieldValue.serverTimestamp(),
       });
 
       if (!mounted) return;
-
-      pesan(context, 'Barang berhasil disimpan.');
+      pesan(context, 'Barang berhasil didaftarkan menggunakan barcode asli produk.');
 
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => HalamanDetailBarcode(
-            kode: kode,
-            nama: nama,
-          ),
+          builder: (_) => HalamanDetailBarcode(kode: kode, nama: nama),
         ),
       );
     } catch (e) {
-      pesan(context, 'Gagal menyimpan barang: $e');
+      if (mounted) pesan(context, 'Gagal menyimpan barang: $e');
     } finally {
-      if (mounted) {
-        setState(() => loading = false);
-      }
+      if (mounted) setState(() => loading = false);
     }
   }
 
   @override
   void dispose() {
+    scannerController.dispose();
     kodeCtrl.dispose();
     namaCtrl.dispose();
     kategoriCtrl.dispose();
@@ -565,34 +609,38 @@ class _HalamanInputBarangState extends State<HalamanInputBarang> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Input Barang Baru'),
-      ),
+      appBar: AppBar(title: const Text('Daftarkan Barang')),
       body: ListView(
         padding: const EdgeInsets.all(18),
         children: [
+          Container(
+            padding: const EdgeInsets.all(15),
+            decoration: BoxDecoration(
+              color: Colors.blue.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Text(
+              'Arahkan kamera ke barcode yang tercetak pada kemasan produk. '
+              'Nomor barcode akan dibaca otomatis, jadi tidak perlu diketik.',
+            ),
+          ),
+          const SizedBox(height: 16),
           TextField(
             controller: kodeCtrl,
             readOnly: true,
-            decoration: InputDecoration(
-              labelText: 'Kode Barang Otomatis',
-              prefixIcon: const Icon(Icons.qr_code),
-              suffixIcon: kodeSedangDibuat
-                  ? const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: SizedBox(
-                        height: 18,
-                        width: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                        ),
-                      ),
-                    )
-                  : const Icon(Icons.check_circle, color: Colors.green),
+            decoration: const InputDecoration(
+              labelText: 'Nomor Barcode Produk',
+              hintText: 'Belum dipindai',
+              prefixIcon: Icon(Icons.qr_code_2),
             ),
           ),
-          const SizedBox(height: 15),
-
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: loading || sedangScan ? null : scanBarcodeProduk,
+            icon: const Icon(Icons.qr_code_scanner),
+            label: Text(sedangScan ? 'Membuka kamera...' : 'Pindai Barcode Produk'),
+          ),
+          const SizedBox(height: 18),
           TextField(
             controller: namaCtrl,
             decoration: const InputDecoration(
@@ -601,7 +649,6 @@ class _HalamanInputBarangState extends State<HalamanInputBarang> {
             ),
           ),
           const SizedBox(height: 15),
-
           TextField(
             controller: kategoriCtrl,
             decoration: const InputDecoration(
@@ -610,17 +657,15 @@ class _HalamanInputBarangState extends State<HalamanInputBarang> {
             ),
           ),
           const SizedBox(height: 15),
-
           TextField(
             controller: satuanCtrl,
             decoration: const InputDecoration(
               labelText: 'Satuan',
-              hintText: 'Contoh: Unit, Buah, Pcs',
+              hintText: 'Contoh: Unit, Buah, Pcs, Botol',
               prefixIcon: Icon(Icons.straighten),
             ),
           ),
           const SizedBox(height: 15),
-
           TextField(
             controller: stokCtrl,
             keyboardType: TextInputType.number,
@@ -630,11 +675,10 @@ class _HalamanInputBarangState extends State<HalamanInputBarang> {
             ),
           ),
           const SizedBox(height: 25),
-
           tombolUtama(
             teks: loading ? 'Menyimpan...' : 'Simpan Barang',
             ikon: Icons.save,
-            aksi: loading || kodeSedangDibuat ? null : simpanBarang,
+            aksi: loading || sedangScan ? null : simpanBarang,
           ),
         ],
       ),
@@ -643,7 +687,7 @@ class _HalamanInputBarangState extends State<HalamanInputBarang> {
 }
 
 // =====================================================
-// DETAIL BARCODE
+// DETAIL BARCODE PRODUK ASLI
 // =====================================================
 
 class HalamanDetailBarcode extends StatelessWidget {
@@ -659,9 +703,7 @@ class HalamanDetailBarcode extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Barcode Barang'),
-      ),
+      appBar: AppBar(title: const Text('Barcode Produk')),
       body: Center(
         child: Card(
           margin: const EdgeInsets.all(22),
@@ -670,45 +712,31 @@ class HalamanDetailBarcode extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
-                  Icons.inventory_2,
-                  size: 55,
-                  color: Colors.blue,
-                ),
+                const Icon(Icons.inventory_2, size: 55, color: Colors.blue),
                 const SizedBox(height: 15),
                 Text(
                   nama,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 10),
-                Text('Kode: $kode'),
-                const SizedBox(height: 25),
-
-                BarcodeWidget(
-                barcode: bc.Barcode.code128(),
-                data: kode,
-                width: 280,
-                height: 100,
-                drawText: true,
+                const SizedBox(height: 12),
+                const Text('Nomor barcode asli pada kemasan:'),
+                const SizedBox(height: 8),
+                SelectableText(
+                  kode,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
-
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
                 const Text(
-                  'Barcode dapat dipindai melalui aplikasi.',
+                  'Gunakan barcode fisik pada kemasan ini saat petugas melakukan scan opname.',
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 20),
-
                 tombolUtama(
                   teks: 'Selesai',
                   ikon: Icons.check,
-                  aksi: () {
-                    Navigator.pop(context);
-                  },
+                  aksi: () => Navigator.pop(context),
                 ),
               ],
             ),
@@ -1039,6 +1067,23 @@ class HalamanScanner extends StatefulWidget {
 class _HalamanScannerState extends State<HalamanScanner> {
   bool sedangMemproses = false;
 
+  // Kamera belakang dan format barcode batang produk.
+  final MobileScannerController scannerController = MobileScannerController(
+    facing: CameraFacing.back,
+    detectionSpeed: DetectionSpeed.noDuplicates,
+    formats: const <BarcodeFormat>[
+      BarcodeFormat.ean13,
+      BarcodeFormat.ean8,
+      BarcodeFormat.upcA,
+      BarcodeFormat.upcE,
+      BarcodeFormat.code128,
+      BarcodeFormat.code39,
+      BarcodeFormat.code93,
+      BarcodeFormat.codabar,
+      BarcodeFormat.itf,
+    ],
+  );
+
   Future<void> prosesBarcode(String kode) async {
     if (sedangMemproses) return;
 
@@ -1145,6 +1190,12 @@ class _HalamanScannerState extends State<HalamanScanner> {
   }
 
   @override
+  void dispose() {
+    scannerController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -1154,13 +1205,15 @@ class _HalamanScannerState extends State<HalamanScanner> {
         children: [
           Expanded(
             child: MobileScanner(
+              controller: scannerController,
               onDetect: (capture) {
                 if (sedangMemproses) return;
 
-                final kode = capture.barcodes.firstOrNull?.rawValue;
-
-                if (kode != null && kode.isNotEmpty) {
+                for (final barcode in capture.barcodes) {
+                  final kode = barcode.rawValue?.trim();
+                  if (kode == null || kode.isEmpty) continue;
                   prosesBarcode(kode);
+                  break;
                 }
               },
             ),
