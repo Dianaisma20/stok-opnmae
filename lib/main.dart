@@ -1,8 +1,12 @@
+import 'dart:convert';
+import 'dart:io';
 
-import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import 'firebase_options.dart';
 
@@ -15,23 +19,26 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  runApp(const AplikasiOpname());
+  runApp(const AplikasiInventaris());
 }
 
 // =====================================================
-// APLIKASI UTAMA
+// APLIKASI
 // =====================================================
 
-class AplikasiOpname extends StatelessWidget {
-  const AplikasiOpname({super.key});
+class AplikasiInventaris extends StatelessWidget {
+  const AplikasiInventaris({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'DISKOMINFO OPNAME',
+      title: 'DISKOMINFO INVENTARIS',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xff1565c0),
+        ),
         scaffoldBackgroundColor: const Color(0xfff5f7fb),
         appBarTheme: const AppBarTheme(
           backgroundColor: Color(0xff1565c0),
@@ -44,6 +51,10 @@ class AplikasiOpname extends StatelessWidget {
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
           ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xffdbe2ea)),
+          ),
         ),
       ),
       home: const HalamanLogin(),
@@ -52,12 +63,15 @@ class AplikasiOpname extends StatelessWidget {
 }
 
 // =====================================================
-// FUNGSI BANTUAN
+// HELPER
 // =====================================================
 
 void pesan(BuildContext context, String isi) {
   ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text(isi)),
+    SnackBar(
+      content: Text(isi),
+      behavior: SnackBarBehavior.floating,
+    ),
   );
 }
 
@@ -71,55 +85,35 @@ void logout(BuildContext context) {
   );
 }
 
-Widget kartuMenu({
-  required BuildContext context,
-  required String judul,
-  required String deskripsi,
-  required IconData ikon,
-  required Color warna,
-  required VoidCallback aksi,
-}) {
-  return Card(
-    elevation: 2,
-    margin: const EdgeInsets.only(bottom: 14),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(15),
-    ),
-    child: ListTile(
-      contentPadding: const EdgeInsets.all(16),
-      leading: CircleAvatar(
-        radius: 25,
-        backgroundColor: warna.withOpacity(0.12),
-        child: Icon(ikon, color: warna, size: 27),
-      ),
-      title: Text(
-        judul,
-        style: const TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: 15,
-        ),
-      ),
-      subtitle: Padding(
-        padding: const EdgeInsets.only(top: 5),
-        child: Text(deskripsi),
-      ),
-      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-      onTap: aksi,
-    ),
-  );
+String tanggalSekarang() {
+  final now = DateTime.now();
+
+  return '${now.day.toString().padLeft(2, '0')}/'
+      '${now.month.toString().padLeft(2, '0')}/'
+      '${now.year}';
+}
+
+String waktuSekarang() {
+  final now = DateTime.now();
+
+  return '${now.day.toString().padLeft(2, '0')}/'
+      '${now.month.toString().padLeft(2, '0')}/'
+      '${now.year} '
+      '${now.hour.toString().padLeft(2, '0')}:'
+      '${now.minute.toString().padLeft(2, '0')}';
 }
 
 Widget tombolUtama({
   required String teks,
   required VoidCallback? aksi,
-  IconData? ikon,
+  IconData ikon = Icons.save,
 }) {
   return SizedBox(
     width: double.infinity,
     height: 50,
     child: ElevatedButton.icon(
       onPressed: aksi,
-      icon: Icon(ikon ?? Icons.save),
+      icon: Icon(ikon),
       label: Text(teks),
       style: ElevatedButton.styleFrom(
         backgroundColor: const Color(0xff1565c0),
@@ -130,6 +124,117 @@ Widget tombolUtama({
       ),
     ),
   );
+}
+
+Widget kartuMenu({
+  required String judul,
+  required String deskripsi,
+  required IconData ikon,
+  required Color warna,
+  required VoidCallback aksi,
+}) {
+  return Card(
+    elevation: 1,
+    margin: const EdgeInsets.only(bottom: 14),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: ListTile(
+      contentPadding: const EdgeInsets.all(16),
+      leading: CircleAvatar(
+        radius: 25,
+        backgroundColor: warna.withOpacity(0.12),
+        child: Icon(
+          ikon,
+          color: warna,
+          size: 27,
+        ),
+      ),
+      title: Text(
+        judul,
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: 5),
+        child: Text(deskripsi),
+      ),
+      trailing: const Icon(
+        Icons.arrow_forward_ios,
+        size: 16,
+      ),
+      onTap: aksi,
+    ),
+  );
+}
+
+Widget kartuStatistik({
+  required String judul,
+  required String nilai,
+  required IconData ikon,
+  required Color warna,
+}) {
+  return Card(
+    elevation: 1,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(15),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: warna.withOpacity(0.12),
+            child: Icon(
+              ikon,
+              color: warna,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  judul,
+                  style: const TextStyle(
+                    color: Colors.grey,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  nilai,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Future<void> catatAudit({
+  required String aksi,
+  required String kodeAset,
+  required String namaAset,
+  required String pengguna,
+  String keterangan = '',
+}) async {
+  await db.collection('audit_trail').add({
+    'aksi': aksi,
+    'kode_aset': kodeAset,
+    'nama_aset': namaAset,
+    'pengguna': pengguna,
+    'keterangan': keterangan,
+    'waktu': FieldValue.serverTimestamp(),
+  });
 }
 
 // =====================================================
@@ -176,8 +281,11 @@ class _HalamanLoginState extends State<HalamanLogin> {
 
       final data = hasil.docs.first.data();
 
-      final nama = data['nama']?.toString() ?? 'Pengguna';
-      final role = data['role']?.toString().toLowerCase() ?? '';
+      final nama =
+          data['nama']?.toString() ?? 'Pengguna';
+
+      final role =
+          data['role']?.toString().toLowerCase() ?? '';
 
       if (!mounted) return;
 
@@ -191,21 +299,21 @@ class _HalamanLoginState extends State<HalamanLogin> {
             ),
           ),
         );
-      } else if (role == 'petugas') {
+      } else if (role == 'pegawai' || role == 'petugas') {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => HalamanPetugas(
+            builder: (_) => HalamanPegawai(
               nama: nama,
               email: email,
             ),
           ),
         );
-      } else if (role == 'kadin') {
+      } else if (role == 'pimpinan' || role == 'kadin') {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => HalamanKadin(
+            builder: (_) => HalamanPimpinan(
               nama: nama,
               email: email,
             ),
@@ -236,65 +344,84 @@ class _HalamanLoginState extends State<HalamanLogin> {
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(25),
-          child: Column(
-            children: [
-              const Icon(
-                Icons.inventory_2,
-                size: 85,
-                color: Color(0xff1565c0),
-              ),
-              const SizedBox(height: 15),
-              const Text(
-                'DISKOMINFO OPNAME',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: 450,
+            ),
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.inventory_2,
+                  size: 85,
+                  color: Color(0xff1565c0),
                 ),
-              ),
-              const Text(
-                'Sistem Informasi Stock Opname Barang',
-                style: TextStyle(color: Colors.grey),
-              ),
-              const SizedBox(height: 35),
 
-              TextField(
-                controller: emailCtrl,
-                keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
-                  labelText: 'Email',
-                  prefixIcon: Icon(Icons.email),
-                ),
-              ),
-              const SizedBox(height: 15),
+                const SizedBox(height: 15),
 
-              TextField(
-                controller: passwordCtrl,
-                obscureText: sembunyikanPassword,
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  prefixIcon: const Icon(Icons.lock),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      sembunyikanPassword
-                          ? Icons.visibility
-                          : Icons.visibility_off,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        sembunyikanPassword = !sembunyikanPassword;
-                      });
-                    },
+                const Text(
+                  'DISKOMINFO INVENTARIS',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-              ),
-              const SizedBox(height: 25),
 
-              tombolUtama(
-                teks: loading ? 'Memproses...' : 'LOGIN',
-                ikon: Icons.login,
-                aksi: loading ? null : login,
-              ),
-            ],
+                const SizedBox(height: 5),
+
+                const Text(
+                  'Sistem Informasi Inventarisasi Aset',
+                  style: TextStyle(
+                    color: Colors.grey,
+                  ),
+                ),
+
+                const SizedBox(height: 35),
+
+                TextField(
+                  controller: emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
+                    prefixIcon: Icon(Icons.email),
+                  ),
+                ),
+
+                const SizedBox(height: 15),
+
+                TextField(
+                  controller: passwordCtrl,
+                  obscureText: sembunyikanPassword,
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    prefixIcon: const Icon(Icons.lock),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        sembunyikanPassword
+                            ? Icons.visibility
+                            : Icons.visibility_off,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          sembunyikanPassword =
+                              !sembunyikanPassword;
+                        });
+                      },
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 25),
+
+                tombolUtama(
+                  teks: loading
+                      ? 'Memproses...'
+                      : 'LOGIN',
+                  ikon: Icons.login,
+                  aksi: loading ? null : login,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -328,65 +455,76 @@ class HalamanAdmin extends StatelessWidget {
           ),
         ],
       ),
+
       body: ListView(
         padding: const EdgeInsets.all(18),
         children: [
           Text(
             'Selamat datang, $nama',
             style: const TextStyle(
-              fontSize: 21,
+              fontSize: 22,
               fontWeight: FontWeight.bold,
             ),
           ),
+
           const SizedBox(height: 5),
-          const Text('Administrator Sistem Opname'),
-          const SizedBox(height: 25),
+
+          const Text(
+            'Administrator Sistem Inventaris',
+          ),
+
+          const SizedBox(height: 20),
+
+          const DashboardStatistik(),
+
+          const SizedBox(height: 20),
 
           kartuMenu(
-            context: context,
-            judul: 'Input Barang Baru',
-            deskripsi: 'Daftarkan barang dengan memindai barcode asli pada kemasan.',
-            ikon: Icons.add_box,
+            judul: 'Data Aset',
+            deskripsi:
+                'Melihat, mencari, menambah, dan mengoreksi aset.',
+            ikon: Icons.inventory_2,
             warna: Colors.blue,
             aksi: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const HalamanInputBarang(),
+                  builder: (_) => const HalamanDaftarAset(),
                 ),
               );
             },
           ),
 
           kartuMenu(
-            context: context,
-            judul: 'Data Barang dan Kode Barcode',
-            deskripsi: 'Melihat, mengubah, dan menghapus data barang.',
-            ikon: Icons.inventory,
+            judul: 'Tambah Aset',
+            deskripsi:
+                'Mendaftarkan aset baru dengan kode aset otomatis.',
+            ikon: Icons.add_box,
             warna: Colors.green,
             aksi: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const HalamanDaftarBarang(),
+                  builder: (_) => HalamanTambahAset(
+                    pengguna: nama,
+                  ),
                 ),
               );
             },
           ),
 
           kartuMenu(
-            context: context,
-            judul: 'Persetujuan Opname',
-            deskripsi: 'Menyetujui atau menolak hasil opname petugas.',
-            ikon: Icons.fact_check,
+            judul: 'Impor Data Excel',
+            deskripsi:
+                'Memasukkan banyak data aset dari file CSV/Excel.',
+            ikon: Icons.upload_file,
             warna: Colors.orange,
             aksi: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => HalamanPersetujuanOpname(
-                    namaAdmin: nama,
-                    emailAdmin: email,
+                  builder: (_) => HalamanImporData(
+                    pengguna: nama,
                   ),
                 ),
               );
@@ -394,32 +532,84 @@ class HalamanAdmin extends StatelessWidget {
           ),
 
           kartuMenu(
-            context: context,
-            judul: 'Riwayat Opname',
-            deskripsi: 'Melihat seluruh riwayat pemeriksaan barang.',
-            ikon: Icons.history,
+            judul: 'Inventarisasi',
+            deskripsi:
+                'Membuat dan memantau sesi inventarisasi aset.',
+            ikon: Icons.fact_check,
             warna: Colors.purple,
             aksi: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const HalamanRiwayat(),
+                  builder: (_) => HalamanInventarisasiAdmin(
+                    pengguna: nama,
+                  ),
                 ),
               );
             },
           ),
 
           kartuMenu(
-            context: context,
-            judul: 'Monitoring Stok',
-            deskripsi: 'Melihat kondisi stok seluruh barang.',
-            ikon: Icons.analytics,
+            judul: 'Mutasi Aset',
+            deskripsi:
+                'Memindahkan aset dan melihat riwayat perpindahan.',
+            ikon: Icons.compare_arrows,
             warna: Colors.teal,
             aksi: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const HalamanMonitoringStok(),
+                  builder: (_) => HalamanMutasiAset(
+                    pengguna: nama,
+                  ),
+                ),
+              );
+            },
+          ),
+
+          kartuMenu(
+            judul: 'Usulan Penghapusan',
+            deskripsi:
+                'Melihat aset yang diusulkan untuk dihapus.',
+            ikon: Icons.delete_sweep,
+            warna: Colors.red,
+            aksi: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const HalamanPenghapusan(),
+                ),
+              );
+            },
+          ),
+
+          kartuMenu(
+            judul: 'Audit Trail',
+            deskripsi:
+                'Melihat seluruh aktivitas perubahan data.',
+            ikon: Icons.history,
+            warna: Colors.indigo,
+            aksi: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const HalamanAuditTrail(),
+                ),
+              );
+            },
+          ),
+
+          kartuMenu(
+            judul: 'Ekspor Data',
+            deskripsi:
+                'Mengekspor daftar aset dan hasil inventarisasi.',
+            ikon: Icons.download,
+            warna: Colors.deepOrange,
+            aksi: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const HalamanEksporData(),
                 ),
               );
             },
@@ -431,548 +621,91 @@ class HalamanAdmin extends StatelessWidget {
 }
 
 // =====================================================
-// INPUT BARANG DAN KODE OTOMATIS
+// DASHBOARD STATISTIK
 // =====================================================
 
-class HalamanInputBarang extends StatefulWidget {
-  const HalamanInputBarang({super.key});
+class DashboardStatistik extends StatelessWidget {
+  const DashboardStatistik({super.key});
 
   @override
-  State<HalamanInputBarang> createState() => _HalamanInputBarangState();
-}
-
-class _HalamanInputBarangState extends State<HalamanInputBarang> {
-  final kodeCtrl = TextEditingController();
-  final namaCtrl = TextEditingController();
-  final kategoriCtrl = TextEditingController();
-  final satuanCtrl = TextEditingController();
-  final stokCtrl = TextEditingController();
-
-  bool loading = false;
-  bool sedangScan = false;
-
-  // Fokus pada format barcode batang yang umum dipakai pada kemasan produk.
-  final MobileScannerController scannerController = MobileScannerController(
-    facing: CameraFacing.back,
-    detectionSpeed: DetectionSpeed.noDuplicates,
-    formats: const <BarcodeFormat>[
-      BarcodeFormat.ean13,
-      BarcodeFormat.ean8,
-      BarcodeFormat.upcA,
-      BarcodeFormat.upcE,
-      BarcodeFormat.code128,
-      BarcodeFormat.code39,
-      BarcodeFormat.code93,
-      BarcodeFormat.codabar,
-      BarcodeFormat.itf,
-    ],
-  );
-
-  // Membuka kamera untuk membaca barcode asli pada kemasan produk.
-  Future<void> scanBarcodeProduk() async {
-    if (sedangScan) return;
-    setState(() => sedangScan = true);
-
-    bool sudahTerbaca = false;
-
-    try {
-      final hasilScan = await showDialog<String>(
-        context: context,
-        barrierDismissible: false,
-        builder: (dialogContext) {
-          return AlertDialog(
-            title: const Text('Pindai Barcode Produk'),
-            content: SizedBox(
-              width: 320,
-              height: 350,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: MobileScanner(
-                  controller: scannerController,
-                  onDetect: (capture) {
-                    if (sudahTerbaca) return;
-
-                    // Periksa semua hasil deteksi, bukan hanya barcode pertama.
-                    for (final barcode in capture.barcodes) {
-                      final nilai = barcode.rawValue?.trim();
-                      if (nilai == null || nilai.isEmpty) continue;
-
-                      sudahTerbaca = true;
-                      Navigator.of(dialogContext).pop(nilai);
-                      break;
-                    }
-                  },
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text('Batal'),
-              ),
-            ],
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: db.collection('barang').snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(
+            child: CircularProgressIndicator(),
           );
-        },
-      );
-
-      if (!mounted) return;
-
-      if (hasilScan != null && hasilScan.isNotEmpty) {
-        final ref = db.collection('barang').doc(hasilScan);
-        final cek = await ref.get();
-
-        if (!mounted) return;
-
-        if (cek.exists) {
-          pesan(context, 'Barcode $hasilScan sudah terdaftar sebagai barang.');
-          return;
         }
 
-        setState(() {
-          kodeCtrl.text = hasilScan;
-        });
-        pesan(context, 'Barcode berhasil dibaca: $hasilScan');
-      }
-    } catch (e) {
-      if (mounted) pesan(context, 'Gagal memindai barcode: $e');
-    } finally {
-      if (mounted) setState(() => sedangScan = false);
-    }
-  }
+        final data = snapshot.data!.docs;
 
-  Future<void> simpanBarang() async {
-    final kode = kodeCtrl.text.trim();
-    final nama = namaCtrl.text.trim();
-    final kategori = kategoriCtrl.text.trim();
-    final satuan = satuanCtrl.text.trim();
-    final stok = int.tryParse(stokCtrl.text.trim());
+        int baik = 0;
+        int rusakRingan = 0;
+        int rusakBerat = 0;
 
-    if (kode.isEmpty) {
-      pesan(context, 'Pindai barcode produk terlebih dahulu.');
-      return;
-    }
+        for (final doc in data) {
+          final kondisi =
+              doc.data()['kondisi']?.toString();
 
-    if (nama.isEmpty || kategori.isEmpty || satuan.isEmpty || stok == null || stok < 0) {
-      pesan(context, 'Periksa kembali nama, kategori, satuan, dan stok awal.');
-      return;
-    }
+          if (kondisi == 'Baik') {
+            baik++;
+          } else if (kondisi == 'Rusak Ringan') {
+            rusakRingan++;
+          } else if (kondisi == 'Rusak Berat') {
+            rusakBerat++;
+          }
+        }
 
-    setState(() => loading = true);
-
-    try {
-      final ref = db.collection('barang').doc(kode);
-      final cek = await ref.get();
-
-      if (cek.exists) {
-        pesan(context, 'Barcode ini sudah terdaftar. Gunakan data barang yang sudah ada.');
-        return;
-      }
-
-      await ref.set({
-        'kode_barang': kode,
-        'nama_barang': nama,
-        'kategori': kategori,
-        'satuan': satuan,
-        'stok_sistem': stok,
-        'jenis_barcode': 'barcode_produk_asli',
-        'created_at': FieldValue.serverTimestamp(),
-        'updated_at': FieldValue.serverTimestamp(),
-      });
-
-      if (!mounted) return;
-      pesan(context, 'Barang berhasil didaftarkan menggunakan barcode asli produk.');
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => HalamanDetailBarcode(kode: kode, nama: nama),
-        ),
-      );
-    } catch (e) {
-      if (mounted) pesan(context, 'Gagal menyimpan barang: $e');
-    } finally {
-      if (mounted) setState(() => loading = false);
-    }
-  }
-
-  @override
-  void dispose() {
-    scannerController.dispose();
-    kodeCtrl.dispose();
-    namaCtrl.dispose();
-    kategoriCtrl.dispose();
-    satuanCtrl.dispose();
-    stokCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Daftarkan Barang')),
-      body: ListView(
-        padding: const EdgeInsets.all(18),
-        children: [
-          Container(
-            padding: const EdgeInsets.all(15),
-            decoration: BoxDecoration(
-              color: Colors.blue.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(12),
+        return Column(
+          children: [
+            kartuStatistik(
+              judul: 'Total Aset',
+              nilai: data.length.toString(),
+              ikon: Icons.inventory_2,
+              warna: Colors.blue,
             ),
-            child: const Text(
-              'Arahkan kamera ke barcode yang tercetak pada kemasan produk. '
-              'Nomor barcode akan dibaca otomatis, jadi tidak perlu diketik.',
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: kodeCtrl,
-            readOnly: true,
-            decoration: const InputDecoration(
-              labelText: 'Nomor Barcode Produk',
-              hintText: 'Belum dipindai',
-              prefixIcon: Icon(Icons.qr_code_2),
-            ),
-          ),
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed: loading || sedangScan ? null : scanBarcodeProduk,
-            icon: const Icon(Icons.qr_code_scanner),
-            label: Text(sedangScan ? 'Membuka kamera...' : 'Pindai Barcode Produk'),
-          ),
-          const SizedBox(height: 18),
-          TextField(
-            controller: namaCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Nama Barang',
-              prefixIcon: Icon(Icons.inventory),
-            ),
-          ),
-          const SizedBox(height: 15),
-          TextField(
-            controller: kategoriCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Kategori Barang',
-              prefixIcon: Icon(Icons.category),
-            ),
-          ),
-          const SizedBox(height: 15),
-          TextField(
-            controller: satuanCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Satuan',
-              hintText: 'Contoh: Unit, Buah, Pcs, Botol',
-              prefixIcon: Icon(Icons.straighten),
-            ),
-          ),
-          const SizedBox(height: 15),
-          TextField(
-            controller: stokCtrl,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Stok Awal',
-              prefixIcon: Icon(Icons.numbers),
-            ),
-          ),
-          const SizedBox(height: 25),
-          tombolUtama(
-            teks: loading ? 'Menyimpan...' : 'Simpan Barang',
-            ikon: Icons.save,
-            aksi: loading || sedangScan ? null : simpanBarang,
-          ),
-        ],
-      ),
-    );
-  }
-}
 
-// =====================================================
-// DETAIL BARCODE PRODUK ASLI
-// =====================================================
+            const SizedBox(height: 10),
 
-class HalamanDetailBarcode extends StatelessWidget {
-  final String kode;
-  final String nama;
-
-  const HalamanDetailBarcode({
-    super.key,
-    required this.kode,
-    required this.nama,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Barcode Produk')),
-      body: Center(
-        child: Card(
-          margin: const EdgeInsets.all(22),
-          child: Padding(
-            padding: const EdgeInsets.all(22),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+            Row(
               children: [
-                const Icon(Icons.inventory_2, size: 55, color: Colors.blue),
-                const SizedBox(height: 15),
-                Text(
-                  nama,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                Expanded(
+                  child: kartuStatistik(
+                    judul: 'Baik',
+                    nilai: baik.toString(),
+                    ikon: Icons.check_circle,
+                    warna: Colors.green,
+                  ),
                 ),
-                const SizedBox(height: 12),
-                const Text('Nomor barcode asli pada kemasan:'),
-                const SizedBox(height: 8),
-                SelectableText(
-                  kode,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Gunakan barcode fisik pada kemasan ini saat petugas melakukan scan opname.',
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 20),
-                tombolUtama(
-                  teks: 'Selesai',
-                  ikon: Icons.check,
-                  aksi: () => Navigator.pop(context),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: kartuStatistik(
+                    judul: 'Rusak',
+                    nilai:
+                        (rusakRingan + rusakBerat).toString(),
+                    ikon: Icons.warning,
+                    warna: Colors.orange,
+                  ),
                 ),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// =====================================================
-// DAFTAR BARANG
-// =====================================================
-
-class HalamanDaftarBarang extends StatelessWidget {
-  const HalamanDaftarBarang({super.key});
-
-  Future<void> hapusBarang(
-    BuildContext context,
-    String kode,
-  ) async {
-    final yakin = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Hapus Barang'),
-        content: Text('Yakin ingin menghapus barang $kode?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Hapus'),
-          ),
-        ],
-      ),
-    );
-
-    if (yakin != true) return;
-
-    try {
-      await db.collection('barang').doc(kode).delete();
-
-      if (context.mounted) {
-        pesan(context, 'Barang berhasil dihapus.');
-      }
-    } catch (e) {
-      if (context.mounted) {
-        pesan(context, 'Gagal menghapus: $e');
-      }
-    }
-  }
-
-  Future<void> editBarang(
-    BuildContext context,
-    String kode,
-    Map<String, dynamic> data,
-  ) async {
-    final namaCtrl = TextEditingController(
-      text: data['nama_barang']?.toString() ?? '',
-    );
-
-    final stokCtrl = TextEditingController(
-      text: (data['stok_sistem'] ?? 0).toString(),
-    );
-
-    final hasil = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Edit Barang'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: namaCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Nama Barang',
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: stokCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Stok Sistem',
-              ),
-            ),
           ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Simpan'),
-          ),
-        ],
-      ),
-    );
-
-    if (hasil == true) {
-      final stok = int.tryParse(stokCtrl.text.trim());
-
-      if (namaCtrl.text.trim().isEmpty || stok == null || stok < 0) {
-        if (context.mounted) {
-          pesan(context, 'Data tidak valid.');
-        }
-      } else {
-        try {
-          await db.collection('barang').doc(kode).update({
-            'nama_barang': namaCtrl.text.trim(),
-            'stok_sistem': stok,
-            'updated_at': FieldValue.serverTimestamp(),
-          });
-
-          if (context.mounted) {
-            pesan(context, 'Barang berhasil diperbarui.');
-          }
-        } catch (e) {
-          if (context.mounted) {
-            pesan(context, 'Gagal mengubah barang: $e');
-          }
-        }
-      }
-    }
-
-    namaCtrl.dispose();
-    stokCtrl.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Data Barang'),
-      ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: db.collection('barang').orderBy('kode_barang').snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(
-              child: Text('Terjadi kesalahan: ${snapshot.error}'),
-            );
-          }
-
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final dokumen = snapshot.data!.docs;
-
-          if (dokumen.isEmpty) {
-            return const Center(
-              child: Text('Belum ada data barang.'),
-            );
-          }
-
-          return ListView.builder(
-            padding: const EdgeInsets.all(15),
-            itemCount: dokumen.length,
-            itemBuilder: (context, index) {
-              final doc = dokumen[index];
-              final data = doc.data();
-
-              final kode = data['kode_barang']?.toString() ?? doc.id;
-              final nama = data['nama_barang']?.toString() ?? '-';
-              final stok = data['stok_sistem'] ?? 0;
-
-              return Card(
-                margin: const EdgeInsets.only(bottom: 12),
-                child: ListTile(
-                  title: Text(
-                    nama,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  subtitle: Text(
-                    'Kode: $kode\nStok: $stok ${data['satuan'] ?? ''}',
-                  ),
-                  isThreeLine: true,
-                  trailing: PopupMenuButton<String>(
-                    onSelected: (pilihan) {
-                      if (pilihan == 'barcode') {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => HalamanDetailBarcode(
-                              kode: kode,
-                              nama: nama,
-                            ),
-                          ),
-                        );
-                      } else if (pilihan == 'edit') {
-                        editBarang(context, kode, data);
-                      } else if (pilihan == 'hapus') {
-                        hapusBarang(context, kode);
-                      }
-                    },
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(
-                        value: 'barcode',
-                        child: Text('Lihat Barcode'),
-                      ),
-                      PopupMenuItem(
-                        value: 'edit',
-                        child: Text('Edit Barang'),
-                      ),
-                      PopupMenuItem(
-                        value: 'hapus',
-                        child: Text('Hapus Barang'),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      ),
+        );
+      },
     );
   }
 }
 
 // =====================================================
-// DASHBOARD PETUGAS
+// DASHBOARD PEGAWAI
 // =====================================================
 
-class HalamanPetugas extends StatelessWidget {
+class HalamanPegawai extends StatelessWidget {
   final String nama;
   final String email;
 
-  const HalamanPetugas({
+  const HalamanPegawai({
     super.key,
     required this.nama,
     required this.email,
@@ -982,7 +715,7 @@ class HalamanPetugas extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dashboard Petugas'),
+        title: const Text('Dashboard Pegawai'),
         actions: [
           IconButton(
             onPressed: () => logout(context),
@@ -996,27 +729,47 @@ class HalamanPetugas extends StatelessWidget {
           Text(
             'Selamat datang, $nama',
             style: const TextStyle(
-              fontSize: 21,
+              fontSize: 22,
               fontWeight: FontWeight.bold,
             ),
           ),
+
           const SizedBox(height: 5),
-          const Text('Petugas Stock Opname'),
+
+          const Text(
+            'Pengelolaan dan pemeriksaan aset',
+          ),
+
           const SizedBox(height: 25),
 
           kartuMenu(
-            context: context,
-            judul: 'Scan Barcode',
-            deskripsi: 'Pindai barcode barang dan masukkan stok fisik.',
-            ikon: Icons.qr_code_scanner,
+            judul: 'Lihat Data Aset',
+            deskripsi:
+                'Cari dan lihat informasi aset yang tersedia.',
+            ikon: Icons.search,
             warna: Colors.blue,
             aksi: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => HalamanScanner(
-                    nama: nama,
-                    email: email,
+                  builder: (_) => const HalamanDaftarAset(),
+                ),
+              );
+            },
+          ),
+
+          kartuMenu(
+            judul: 'Tambah Aset',
+            deskripsi:
+                'Tambah aset baru menggunakan kode aset otomatis.',
+            ikon: Icons.add_box,
+            warna: Colors.green,
+            aksi: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => HalamanTambahAset(
+                    pengguna: nama,
                   ),
                 ),
               );
@@ -1024,18 +777,70 @@ class HalamanPetugas extends StatelessWidget {
           ),
 
           kartuMenu(
-            context: context,
-            judul: 'Riwayat Opname Saya',
-            deskripsi: 'Melihat hasil opname yang pernah dikirim.',
-            ikon: Icons.history,
-            warna: Colors.green,
+            judul: 'Inventarisasi',
+            deskripsi:
+                'Melakukan pemeriksaan fisik berdasarkan kode aset.',
+            ikon: Icons.fact_check,
+            warna: Colors.orange,
             aksi: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => HalamanRiwayat(
-                    emailPetugas: email,
+                  builder: (_) => HalamanInventarisasiPegawai(
+                    pengguna: nama,
                   ),
+                ),
+              );
+            },
+          ),
+
+          kartuMenu(
+            judul: 'Pindahkan Aset',
+            deskripsi:
+                'Memindahkan aset ke lokasi lain.',
+            ikon: Icons.compare_arrows,
+            warna: Colors.teal,
+            aksi: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => HalamanMutasiAset(
+                    pengguna: nama,
+                  ),
+                ),
+              );
+            },
+          ),
+
+          kartuMenu(
+            judul: 'Usulkan Penghapusan',
+            deskripsi:
+                'Mengusulkan aset yang rusak berat atau tidak layak.',
+            ikon: Icons.delete_outline,
+            warna: Colors.red,
+            aksi: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => HalamanFormPenghapusan(
+                    pengguna: nama,
+                  ),
+                ),
+              );
+            },
+          ),
+
+          kartuMenu(
+            judul: 'Riwayat Inventarisasi',
+            deskripsi:
+                'Melihat hasil pemeriksaan inventarisasi.',
+            ikon: Icons.history,
+            warna: Colors.purple,
+            aksi: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const HalamanHasilInventarisasi(),
                 ),
               );
             },
@@ -1047,151 +852,302 @@ class HalamanPetugas extends StatelessWidget {
 }
 
 // =====================================================
-// SCANNER BARCODE
+// DASHBOARD PIMPINAN
 // =====================================================
 
-class HalamanScanner extends StatefulWidget {
+class HalamanPimpinan extends StatelessWidget {
   final String nama;
   final String email;
 
-  const HalamanScanner({
+  const HalamanPimpinan({
     super.key,
     required this.nama,
     required this.email,
   });
 
   @override
-  State<HalamanScanner> createState() => _HalamanScannerState();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Dashboard Pimpinan'),
+        actions: [
+          IconButton(
+            onPressed: () => logout(context),
+            icon: const Icon(Icons.logout),
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(18),
+        children: [
+          Text(
+            'Selamat datang, $nama',
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+
+          const SizedBox(height: 5),
+
+          const Text(
+            'Persetujuan dan laporan inventarisasi',
+          ),
+
+          const SizedBox(height: 25),
+
+          kartuMenu(
+            judul: 'Persetujuan Inventarisasi',
+            deskripsi:
+                'Menyetujui atau menolak hasil inventarisasi.',
+            ikon: Icons.fact_check,
+            warna: Colors.orange,
+            aksi: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      const HalamanPersetujuanInventarisasi(),
+                ),
+              );
+            },
+          ),
+
+          kartuMenu(
+            judul: 'Persetujuan Penghapusan',
+            deskripsi:
+                'Menyetujui atau menolak usulan penghapusan aset.',
+            ikon: Icons.delete_sweep,
+            warna: Colors.red,
+            aksi: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const HalamanPersetujuanPenghapusan(),
+                ),
+              );
+            },
+          ),
+
+          kartuMenu(
+            judul: 'Berita Acara',
+            deskripsi:
+                'Melihat berita acara yang dibuat otomatis sistem.',
+            ikon: Icons.description,
+            warna: Colors.blue,
+            aksi: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const HalamanBeritaAcara(),
+                ),
+              );
+            },
+          ),
+
+          kartuMenu(
+            judul: 'Hasil dan Selisih',
+            deskripsi:
+                'Melihat hasil pemeriksaan dan selisih inventarisasi.',
+            ikon: Icons.analytics,
+            warna: Colors.green,
+            aksi: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const HalamanHasilInventarisasi(),
+                ),
+              );
+            },
+          ),
+
+          kartuMenu(
+            judul: 'Laporan Resmi',
+            deskripsi:
+                'Rekap aset berdasarkan lokasi, kategori, dan kondisi.',
+            ikon: Icons.assessment,
+            warna: Colors.purple,
+            aksi: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const HalamanLaporan(),
+                ),
+              );
+            },
+          ),
+
+          kartuMenu(
+            judul: 'Audit Trail',
+            deskripsi:
+                'Melihat jejak aktivitas pengguna.',
+            ikon: Icons.history,
+            warna: Colors.indigo,
+            aksi: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const HalamanAuditTrail(),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _HalamanScannerState extends State<HalamanScanner> {
-  bool sedangMemproses = false;
+// =====================================================
+// TAMBAH ASET
+// =====================================================
 
-  // Kamera belakang dan format barcode batang produk.
-  final MobileScannerController scannerController = MobileScannerController(
-    facing: CameraFacing.back,
-    detectionSpeed: DetectionSpeed.noDuplicates,
-    formats: const <BarcodeFormat>[
-      BarcodeFormat.ean13,
-      BarcodeFormat.ean8,
-      BarcodeFormat.upcA,
-      BarcodeFormat.upcE,
-      BarcodeFormat.code128,
-      BarcodeFormat.code39,
-      BarcodeFormat.code93,
-      BarcodeFormat.codabar,
-      BarcodeFormat.itf,
-    ],
-  );
+class HalamanTambahAset extends StatefulWidget {
+  final String pengguna;
 
-  Future<void> prosesBarcode(String kode) async {
-    if (sedangMemproses) return;
+  const HalamanTambahAset({
+    super.key,
+    required this.pengguna,
+  });
 
-    setState(() => sedangMemproses = true);
+  @override
+  State<HalamanTambahAset> createState() =>
+      _HalamanTambahAsetState();
+}
 
+class _HalamanTambahAsetState
+    extends State<HalamanTambahAset> {
+  final namaCtrl = TextEditingController();
+  final kategoriCtrl = TextEditingController();
+  final lokasiCtrl = TextEditingController();
+  final merkCtrl = TextEditingController();
+  final tipeCtrl = TextEditingController();
+  final tahunCtrl = TextEditingController();
+  final keteranganCtrl = TextEditingController();
+
+  String kondisi = 'Baik';
+  String kodeAset = '';
+  bool loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    generateKodeAset();
+  }
+
+  Future<void> generateKodeAset() async {
     try {
-      final hasil = await db.collection('barang').doc(kode).get();
+      final snapshot =
+          await db.collection('barang').get();
+
+      int terbesar = 0;
+
+      for (final doc in snapshot.docs) {
+        final kode =
+            doc.data()['kode_aset']?.toString() ?? '';
+
+        final match =
+            RegExp(r'AST-(\d+)').firstMatch(kode);
+
+        if (match != null) {
+          final nomor = int.tryParse(
+                match.group(1) ?? '',
+              ) ??
+              0;
+
+          if (nomor > terbesar) {
+            terbesar = nomor;
+          }
+        }
+      }
 
       if (!mounted) return;
 
-      if (!hasil.exists) {
-        pesan(context, 'Barang dengan kode $kode tidak ditemukan.');
-        return;
-      }
-
-      final data = hasil.data()!;
-      final stokSistem = (data['stok_sistem'] as num?)?.toInt() ?? 0;
-
-      final stokCtrl = TextEditingController();
-
-      final stokFisik = await showDialog<int>(
-        context: context,
-        barrierDismissible: false,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Input Stok Fisik'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Barang: ${data['nama_barang'] ?? '-'}'),
-              Text('Kode: $kode'),
-              Text('Stok Sistem: $stokSistem'),
-              const SizedBox(height: 15),
-              TextField(
-                controller: stokCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Jumlah Stok Fisik',
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Batal'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final angka = int.tryParse(stokCtrl.text.trim());
-
-                if (angka == null || angka < 0) {
-                  pesan(dialogContext, 'Masukkan stok yang valid.');
-                  return;
-                }
-
-                Navigator.pop(dialogContext, angka);
-              },
-              child: const Text('Kirim Opname'),
-            ),
-          ],
-        ),
-      );
-
-      stokCtrl.dispose();
-
-      if (stokFisik == null) return;
-
-      final selisih = stokFisik - stokSistem;
-
-      await db.collection('opname').add({
-        'kode_barang': kode,
-        'nama_barang': data['nama_barang'] ?? '-',
-        'kategori': data['kategori'] ?? '-',
-        'satuan': data['satuan'] ?? '-',
-        'stok_sebelum': stokSistem,
-        'stok_sistem': stokSistem,
-        'stok_fisik': stokFisik,
-        'selisih': selisih,
-        'petugas': widget.nama,
-        'email_petugas': widget.email,
-        'status': 'menunggu_persetujuan',
-        'approved_by': null,
-        'approved_at': null,
-        'catatan_admin': null,
-        'created_at': FieldValue.serverTimestamp(),
+      setState(() {
+        kodeAset =
+            'AST-${(terbesar + 1).toString().padLeft(6, '0')}';
       });
-
+    } catch (e) {
       if (mounted) {
         pesan(
           context,
-          'Opname berhasil dikirim! Menunggu persetujuan admin.',
+          'Gagal membuat kode aset: $e',
         );
       }
+    }
+  }
+
+  Future<void> simpanAset() async {
+    if (namaCtrl.text.trim().isEmpty ||
+        kategoriCtrl.text.trim().isEmpty ||
+        lokasiCtrl.text.trim().isEmpty) {
+      pesan(
+        context,
+        'Nama, kategori, dan lokasi wajib diisi.',
+      );
+      return;
+    }
+
+    if (kodeAset.isEmpty) {
+      pesan(context, 'Kode aset belum tersedia.');
+      return;
+    }
+
+    setState(() => loading = true);
+
+    try {
+      await db.collection('barang').doc(kodeAset).set({
+        'kode_aset': kodeAset,
+        'nama_barang': namaCtrl.text.trim(),
+        'kategori': kategoriCtrl.text.trim(),
+        'lokasi': lokasiCtrl.text.trim(),
+        'merk': merkCtrl.text.trim(),
+        'tipe': tipeCtrl.text.trim(),
+        'tahun_perolehan': tahunCtrl.text.trim(),
+        'kondisi': kondisi,
+        'status_aset': 'aktif',
+        'keterangan': keteranganCtrl.text.trim(),
+        'created_by': widget.pengguna,
+        'created_at': FieldValue.serverTimestamp(),
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+
+      await catatAudit(
+        aksi: 'MENAMBAH ASET',
+        kodeAset: kodeAset,
+        namaAset: namaCtrl.text.trim(),
+        pengguna: widget.pengguna,
+        keterangan: 'Aset baru ditambahkan.',
+      );
+
+      if (!mounted) return;
+
+      pesan(
+        context,
+        'Aset $kodeAset berhasil disimpan.',
+      );
+
+      Navigator.pop(context);
     } catch (e) {
       if (mounted) {
-        pesan(context, 'Gagal memproses barcode: $e');
+        pesan(context, 'Gagal menyimpan aset: $e');
       }
     } finally {
       if (mounted) {
-        setState(() => sedangMemproses = false);
+        setState(() => loading = false);
       }
     }
   }
 
   @override
   void dispose() {
-    scannerController.dispose();
+    namaCtrl.dispose();
+    kategoriCtrl.dispose();
+    lokasiCtrl.dispose();
+    merkCtrl.dispose();
+    tipeCtrl.dispose();
+    tahunCtrl.dispose();
+    keteranganCtrl.dispose();
     super.dispose();
   }
 
@@ -1199,47 +1155,329 @@ class _HalamanScannerState extends State<HalamanScanner> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Scan Barcode'),
+        title: const Text('Tambah Aset'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(18),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.blue.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Kode Aset Otomatis',
+                  style: TextStyle(
+                    color: Colors.grey,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  kodeAset.isEmpty
+                      ? 'Membuat kode...'
+                      : kodeAset,
+                  style: const TextStyle(
+                    fontSize: 25,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                const Text(
+                  'Kode ini menjadi identitas aset di dalam sistem.',
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          TextField(
+            controller: namaCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Nama Aset',
+              prefixIcon: Icon(Icons.inventory_2),
+            ),
+          ),
+
+          const SizedBox(height: 15),
+
+          TextField(
+            controller: kategoriCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Kategori',
+              prefixIcon: Icon(Icons.category),
+            ),
+          ),
+
+          const SizedBox(height: 15),
+
+          TextField(
+            controller: lokasiCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Lokasi',
+              prefixIcon: Icon(Icons.location_on),
+            ),
+          ),
+
+          const SizedBox(height: 15),
+
+          TextField(
+            controller: merkCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Merek',
+              prefixIcon: Icon(Icons.branding_watermark),
+            ),
+          ),
+
+          const SizedBox(height: 15),
+
+          TextField(
+            controller: tipeCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Tipe / Model',
+              prefixIcon: Icon(Icons.devices),
+            ),
+          ),
+
+          const SizedBox(height: 15),
+
+          TextField(
+            controller: tahunCtrl,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Tahun Perolehan',
+              prefixIcon: Icon(Icons.calendar_today),
+            ),
+          ),
+
+          const SizedBox(height: 15),
+
+          DropdownButtonFormField<String>(
+            value: kondisi,
+            decoration: const InputDecoration(
+              labelText: 'Kondisi',
+              prefixIcon: Icon(Icons.health_and_safety),
+            ),
+            items: const [
+              DropdownMenuItem(
+                value: 'Baik',
+                child: Text('Baik'),
+              ),
+              DropdownMenuItem(
+                value: 'Rusak Ringan',
+                child: Text('Rusak Ringan'),
+              ),
+              DropdownMenuItem(
+                value: 'Rusak Berat',
+                child: Text('Rusak Berat'),
+              ),
+            ],
+            onChanged: (value) {
+              setState(() {
+                kondisi = value ?? 'Baik';
+              });
+            },
+          ),
+
+          const SizedBox(height: 15),
+
+          TextField(
+            controller: keteranganCtrl,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: 'Keterangan',
+              prefixIcon: Icon(Icons.notes),
+            ),
+          ),
+
+          const SizedBox(height: 25),
+
+          tombolUtama(
+            teks: loading
+                ? 'Menyimpan...'
+                : 'Simpan Aset',
+            ikon: Icons.save,
+            aksi: loading ? null : simpanAset,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =====================================================
+// DAFTAR ASET
+// =====================================================
+
+class HalamanDaftarAset extends StatefulWidget {
+  const HalamanDaftarAset({super.key});
+
+  @override
+  State<HalamanDaftarAset> createState() =>
+      _HalamanDaftarAsetState();
+}
+
+class _HalamanDaftarAsetState
+    extends State<HalamanDaftarAset> {
+  String pencarian = '';
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Data Aset'),
       ),
       body: Column(
         children: [
-          Expanded(
-            child: MobileScanner(
-              controller: scannerController,
-              onDetect: (capture) {
-                if (sedangMemproses) return;
-
-                for (final barcode in capture.barcodes) {
-                  final kode = barcode.rawValue?.trim();
-                  if (kode == null || kode.isEmpty) continue;
-                  prosesBarcode(kode);
-                  break;
-                }
+          Padding(
+            padding: const EdgeInsets.all(15),
+            child: TextField(
+              decoration: const InputDecoration(
+                hintText:
+                    'Cari kode, nama, kategori, atau lokasi...',
+                prefixIcon: Icon(Icons.search),
+              ),
+              onChanged: (value) {
+                setState(() {
+                  pencarian = value.toLowerCase();
+                });
               },
             ),
           ),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            color: Colors.white,
-            child: Column(
-              children: [
-                const Icon(
-                  Icons.qr_code_scanner,
-                  size: 40,
-                  color: Colors.blue,
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Arahkan kamera ke barcode barang.',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                if (sedangMemproses)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 10),
+
+          Expanded(
+            child:
+                StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: db
+                  .collection('barang')
+                  .orderBy('kode_aset')
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text(
+                      'Gagal memuat data aset:\n${snapshot.error}',
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                }
+
+                if (!snapshot.hasData) {
+                  return const Center(
                     child: CircularProgressIndicator(),
-                  ),
-              ],
+                  );
+                }
+
+                final docs = snapshot.data!.docs;
+
+                final hasil = docs.where((doc) {
+                  final data = doc.data();
+
+                  final teks = [
+                    data['kode_aset'],
+                    data['nama_barang'],
+                    data['kategori'],
+                    data['lokasi'],
+                    data['merk'],
+                  ]
+                      .map((e) => e?.toString() ?? '')
+                      .join(' ')
+                      .toLowerCase();
+
+                  return teks.contains(pencarian);
+                }).toList();
+
+                if (hasil.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'Data aset tidak ditemukan.',
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 15),
+                  itemCount: hasil.length,
+                  itemBuilder: (context, index) {
+                    final doc = hasil[index];
+                    final data = doc.data();
+
+                    final kode =
+                        data['kode_aset']?.toString() ?? doc.id;
+
+                    final nama =
+                        data['nama_barang']?.toString() ?? '-';
+
+                    final lokasi =
+                        data['lokasi']?.toString() ?? '-';
+
+                    final kondisi =
+                        data['kondisi']?.toString() ?? '-';
+
+                    return Card(
+                      margin:
+                          const EdgeInsets.only(bottom: 10),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          child: Text(
+                            kode
+                                .replaceAll('AST-', '')
+                                .substring(
+                                  0,
+                                  kode
+                                          .replaceAll(
+                                            'AST-',
+                                            '',
+                                          )
+                                          .length >
+                                      2
+                                  ? 2
+                                  : kode
+                                      .replaceAll(
+                                        'AST-',
+                                        '',
+                                      )
+                                      .length,
+                                ),
+                          ),
+                        ),
+                        title: Text(
+                          nama,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        subtitle: Text(
+                          '$kode\n$lokasi • $kondisi',
+                        ),
+                        isThreeLine: true,
+                        trailing: const Icon(
+                          Icons.arrow_forward_ios,
+                          size: 16,
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  HalamanDetailAset(
+                                kodeAset: kode,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                );
+              },
             ),
           ),
         ],
@@ -1249,186 +1487,1749 @@ class _HalamanScannerState extends State<HalamanScanner> {
 }
 
 // =====================================================
-// PERSETUJUAN OPNAME OLEH ADMIN
+// DETAIL ASET
 // =====================================================
 
-class HalamanPersetujuanOpname extends StatelessWidget {
-  final String namaAdmin;
-  final String emailAdmin;
+class HalamanDetailAset extends StatelessWidget {
+  final String kodeAset;
 
-  const HalamanPersetujuanOpname({
+  const HalamanDetailAset({
     super.key,
-    required this.namaAdmin,
-    required this.emailAdmin,
+    required this.kodeAset,
   });
 
-  Future<void> setujuiOpname(
-    BuildContext context,
-    String id,
-    Map<String, dynamic> data,
-  ) async {
-    final yakin = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Setujui Opname'),
-        content: Text(
-          'Setujui hasil opname barang ${data['nama_barang'] ?? '-'}? '
-          'Stok master akan diperbarui.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Setujui'),
-          ),
-        ],
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Detail Aset'),
+      ),
+      body: FutureBuilder<
+          DocumentSnapshot<Map<String, dynamic>>>(
+        future:
+            db.collection('barang').doc(kodeAset).get(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+
+          if (!snapshot.data!.exists) {
+            return const Center(
+              child: Text('Aset tidak ditemukan.'),
+            );
+          }
+
+          final data = snapshot.data!.data()!;
+
+          return ListView(
+            padding: const EdgeInsets.all(18),
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.inventory_2,
+                      size: 60,
+                      color: Colors.blue,
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      data['nama_barang']?.toString() ??
+                          '-',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 21,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      kodeAset,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        color: Colors.blue,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              detailItem(
+                'Kategori',
+                data['kategori'],
+              ),
+
+              detailItem(
+                'Lokasi',
+                data['lokasi'],
+              ),
+
+              detailItem(
+                'Merek',
+                data['merk'],
+              ),
+
+              detailItem(
+                'Tipe / Model',
+                data['tipe'],
+              ),
+
+              detailItem(
+                'Tahun Perolehan',
+                data['tahun_perolehan'],
+              ),
+
+              detailItem(
+                'Kondisi',
+                data['kondisi'],
+              ),
+
+              detailItem(
+                'Status Aset',
+                data['status_aset'],
+              ),
+
+              detailItem(
+                'Keterangan',
+                data['keterangan'],
+              ),
+            ],
+          );
+        },
       ),
     );
+  }
 
-    if (yakin != true) return;
+  Widget detailItem(String judul, dynamic nilai) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ListTile(
+        title: Text(
+          judul,
+          style: const TextStyle(
+            fontSize: 12,
+            color: Colors.grey,
+          ),
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            nilai?.toString().isEmpty == true
+                ? '-'
+                : nilai?.toString() ?? '-',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// =====================================================
+// MUTASI ASET
+// =====================================================
+
+class HalamanMutasiAset extends StatefulWidget {
+  final String pengguna;
+
+  const HalamanMutasiAset({
+    super.key,
+    required this.pengguna,
+  });
+
+  @override
+  State<HalamanMutasiAset> createState() =>
+      _HalamanMutasiAsetState();
+}
+
+class _HalamanMutasiAsetState
+    extends State<HalamanMutasiAset> {
+  final kodeCtrl = TextEditingController();
+  final tujuanCtrl = TextEditingController();
+  final alasanCtrl = TextEditingController();
+
+  bool loading = false;
+
+  Future<void> pindahkan() async {
+    final kode = kodeCtrl.text.trim();
+    final tujuan = tujuanCtrl.text.trim();
+    final alasan = alasanCtrl.text.trim();
+
+    if (kode.isEmpty || tujuan.isEmpty) {
+      pesan(
+        context,
+        'Kode aset dan lokasi tujuan wajib diisi.',
+      );
+      return;
+    }
+
+    setState(() => loading = true);
 
     try {
-      await db.runTransaction((transaction) async {
-        final opnameRef = db.collection('opname').doc(id);
-        final opnameSnapshot = await transaction.get(opnameRef);
+      final ref =
+          db.collection('barang').doc(kode);
 
-        if (!opnameSnapshot.exists) {
-          throw Exception('Data opname tidak ditemukan.');
-        }
+      final aset = await ref.get();
 
-        final opnameData = opnameSnapshot.data()!;
+      if (!aset.exists) {
+        pesan(context, 'Aset tidak ditemukan.');
+        return;
+      }
 
-        if (opnameData['status'] != 'menunggu_persetujuan') {
-          throw Exception('Data sudah diproses sebelumnya.');
-        }
+      final data = aset.data()!;
+      final lokasiLama =
+          data['lokasi']?.toString() ?? '-';
 
-        final kode = opnameData['kode_barang']?.toString() ?? '';
-
-        if (kode.isEmpty) {
-          throw Exception('Kode barang tidak tersedia.');
-        }
-
-        final barangRef = db.collection('barang').doc(kode);
-        final barangSnapshot = await transaction.get(barangRef);
-
-        if (!barangSnapshot.exists) {
-          throw Exception('Data barang tidak ditemukan.');
-        }
-
-        final stokFisik =
-            (opnameData['stok_fisik'] as num?)?.toInt();
-
-        if (stokFisik == null || stokFisik < 0) {
-          throw Exception('Stok fisik tidak valid.');
-        }
-
-        final stokSaatPersetujuan =
-            (barangSnapshot.data()?['stok_sistem'] as num?)?.toInt() ?? 0;
-
-        transaction.update(barangRef, {
-          'stok_sistem': stokFisik,
-          'updated_at': FieldValue.serverTimestamp(),
-          'last_approved_opname': id,
-        });
-
-        transaction.update(opnameRef, {
-          'status': 'disetujui',
-          'stok_sebelum_persetujuan': stokSaatPersetujuan,
-          'selisih_persetujuan': stokFisik - stokSaatPersetujuan,
-          'approved_by': namaAdmin,
-          'approved_by_email': emailAdmin,
-          'approved_at': FieldValue.serverTimestamp(),
-          'catatan_admin': 'Opname disetujui.',
-        });
+      await ref.update({
+        'lokasi': tujuan,
+        'updated_at': FieldValue.serverTimestamp(),
       });
 
-      if (context.mounted) {
-        pesan(context, 'Opname berhasil disetujui dan stok diperbarui.');
-      }
+      await db.collection('mutasi_aset').add({
+        'kode_aset': kode,
+        'nama_aset':
+            data['nama_barang']?.toString() ?? '-',
+        'lokasi_lama': lokasiLama,
+        'lokasi_baru': tujuan,
+        'alasan': alasan,
+        'pengguna': widget.pengguna,
+        'waktu': FieldValue.serverTimestamp(),
+      });
+
+      await catatAudit(
+        aksi: 'MEMINDAHKAN ASET',
+        kodeAset: kode,
+        namaAset:
+            data['nama_barang']?.toString() ?? '-',
+        pengguna: widget.pengguna,
+        keterangan:
+            'Dari $lokasiLama ke $tujuan.',
+      );
+
+      if (!mounted) return;
+
+      pesan(
+        context,
+        'Aset berhasil dipindahkan.',
+      );
+
+      kodeCtrl.clear();
+      tujuanCtrl.clear();
+      alasanCtrl.clear();
     } catch (e) {
-      if (context.mounted) {
-        pesan(context, 'Gagal menyetujui opname: $e');
+      if (mounted) {
+        pesan(
+          context,
+          'Gagal memindahkan aset: $e',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => loading = false);
       }
     }
   }
 
-  Future<void> tolakOpname(
-    BuildContext context,
-    String id,
-  ) async {
-    final catatanCtrl = TextEditingController();
+  @override
+  void dispose() {
+    kodeCtrl.dispose();
+    tujuanCtrl.dispose();
+    alasanCtrl.dispose();
+    super.dispose();
+  }
 
-    final catatan = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Tolak Opname'),
-        content: TextField(
-          controller: catatanCtrl,
-          maxLines: 3,
-          decoration: const InputDecoration(
-            labelText: 'Alasan penolakan',
-            hintText: 'Masukkan alasan penolakan...',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (catatanCtrl.text.trim().isEmpty) {
-                pesan(dialogContext, 'Alasan penolakan harus diisi.');
-                return;
-              }
-
-              Navigator.pop(dialogContext, catatanCtrl.text.trim());
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Pindahkan Aset'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(18),
+        children: [
+          const Text(
+            'Masukkan kode aset dan lokasi tujuan.',
+            style: TextStyle(
+              color: Colors.grey,
             ),
-            child: const Text('Tolak Opname'),
+          ),
+
+          const SizedBox(height: 20),
+
+          TextField(
+            controller: kodeCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Kode Aset',
+              hintText: 'Contoh: AST-000001',
+              prefixIcon: Icon(Icons.qr_code_2),
+            ),
+          ),
+
+          const SizedBox(height: 15),
+
+          TextField(
+            controller: tujuanCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Lokasi Tujuan',
+              prefixIcon: Icon(Icons.location_on),
+            ),
+          ),
+
+          const SizedBox(height: 15),
+
+          TextField(
+            controller: alasanCtrl,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: 'Alasan Pemindahan',
+              prefixIcon: Icon(Icons.notes),
+            ),
+          ),
+
+          const SizedBox(height: 25),
+
+          tombolUtama(
+            teks: loading
+                ? 'Menyimpan...'
+                : 'Simpan Pemindahan',
+            ikon: Icons.compare_arrows,
+            aksi: loading ? null : pindahkan,
           ),
         ],
       ),
     );
+  }
+}
 
-    catatanCtrl.dispose();
+// =====================================================
+// IMPOR DATA
+// =====================================================
 
-    if (catatan == null || catatan.isEmpty) return;
+class HalamanImporData extends StatefulWidget {
+  final String pengguna;
+
+  const HalamanImporData({
+    super.key,
+    required this.pengguna,
+  });
+
+  @override
+  State<HalamanImporData> createState() =>
+      _HalamanImporDataState();
+}
+
+class _HalamanImporDataState
+    extends State<HalamanImporData> {
+  bool loading = false;
+
+  Future<void> pilihFile() async {
+    try {
+      final hasil =
+          await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: [
+          'csv',
+          'txt',
+        ],
+      );
+
+      if (hasil == null ||
+          hasil.files.single.path == null) {
+        return;
+      }
+
+      setState(() => loading = true);
+
+      final file =
+          File(hasil.files.single.path!);
+
+      final isi = await file.readAsString();
+
+      await prosesCSV(isi);
+
+      if (mounted) {
+        pesan(
+          context,
+          'Data berhasil diproses.',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        pesan(
+          context,
+          'Gagal mengimpor data: $e',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => loading = false);
+      }
+    }
+  }
+
+  Future<void> prosesCSV(String isi) async {
+    final lines = isi
+        .split('\n')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+
+    if (lines.length < 2) {
+      throw Exception(
+        'File tidak memiliki data.',
+      );
+    }
+
+    final header =
+        lines.first.split(',').map((e) => e.trim()).toList();
+
+    final indexKode =
+        header.indexOf('kode_aset');
+
+    final indexNama =
+        header.indexOf('nama_barang');
+
+    final indexKategori =
+        header.indexOf('kategori');
+
+    final indexLokasi =
+        header.indexOf('lokasi');
+
+    final indexMerk =
+        header.indexOf('merk');
+
+    final indexTipe =
+        header.indexOf('tipe');
+
+    final indexTahun =
+        header.indexOf('tahun_perolehan');
+
+    final indexKondisi =
+        header.indexOf('kondisi');
+
+    final indexKeterangan =
+        header.indexOf('keterangan');
+
+    if (indexKode == -1 ||
+        indexNama == -1 ||
+        indexKategori == -1 ||
+        indexLokasi == -1) {
+      throw Exception(
+        'Kolom wajib tidak lengkap. Gunakan format template yang disediakan.',
+      );
+    }
+
+    int berhasil = 0;
+
+    for (int i = 1; i < lines.length; i++) {
+      final row = lines[i]
+          .split(',')
+          .map((e) => e.trim())
+          .toList();
+
+      String nilai(int index) {
+        if (index < 0 ||
+            index >= row.length) {
+          return '';
+        }
+
+        return row[index];
+      }
+
+      final kode = nilai(indexKode);
+
+      if (kode.isEmpty) {
+        continue;
+      }
+
+      await db.collection('barang').doc(kode).set({
+        'kode_aset': kode,
+        'nama_barang': nilai(indexNama),
+        'kategori': nilai(indexKategori),
+        'lokasi': nilai(indexLokasi),
+        'merk': nilai(indexMerk),
+        'tipe': nilai(indexTipe),
+        'tahun_perolehan': nilai(indexTahun),
+        'kondisi':
+            nilai(indexKondisi).isEmpty
+                ? 'Baik'
+                : nilai(indexKondisi),
+        'keterangan': nilai(indexKeterangan),
+        'status_aset': 'aktif',
+        'updated_at': FieldValue.serverTimestamp(),
+        'imported_by': widget.pengguna,
+      });
+
+      berhasil++;
+    }
+
+    await catatAudit(
+      aksi: 'IMPOR DATA ASET',
+      kodeAset: '-',
+      namaAset: '-',
+      pengguna: widget.pengguna,
+      keterangan:
+          '$berhasil data aset diimpor.',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Impor Data Aset'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(18),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: const Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: Colors.orange,
+                ),
+                SizedBox(height: 10),
+                Text(
+                  'Format CSV yang digunakan:',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'kode_aset,nama_barang,kategori,lokasi,merk,tipe,tahun_perolehan,kondisi,keterangan',
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 25),
+
+          tombolUtama(
+            teks: loading
+                ? 'Mengimpor...'
+                : 'Pilih File CSV',
+            ikon: Icons.upload_file,
+            aksi: loading ? null : pilihFile,
+          ),
+
+          const SizedBox(height: 20),
+
+          const Text(
+            'Catatan',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          const Text(
+            'File dari Excel dapat disimpan sebagai CSV UTF-8 '
+            'kemudian diimpor ke sistem.',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =====================================================
+// INVENTARISASI ADMIN
+// =====================================================
+
+class HalamanInventarisasiAdmin extends StatefulWidget {
+  final String pengguna;
+
+  const HalamanInventarisasiAdmin({
+    super.key,
+    required this.pengguna,
+  });
+
+  @override
+  State<HalamanInventarisasiAdmin> createState() =>
+      _HalamanInventarisasiAdminState();
+}
+
+class _HalamanInventarisasiAdminState
+    extends State<HalamanInventarisasiAdmin> {
+  final namaCtrl = TextEditingController();
+  final lokasiCtrl = TextEditingController();
+
+  bool loading = false;
+
+  Future<void> buatSesi() async {
+    if (namaCtrl.text.trim().isEmpty ||
+        lokasiCtrl.text.trim().isEmpty) {
+      pesan(
+        context,
+        'Nama sesi dan lokasi wajib diisi.',
+      );
+      return;
+    }
+
+    setState(() => loading = true);
 
     try {
-      await db.runTransaction((transaction) async {
-        final ref = db.collection('opname').doc(id);
-        final snapshot = await transaction.get(ref);
+      await db.collection('inventarisasi').add({
+        'nama_sesi': namaCtrl.text.trim(),
+        'lokasi': lokasiCtrl.text.trim(),
+        'tanggal': tanggalSekarang(),
+        'dibuat_oleh': widget.pengguna,
+        'status': 'berlangsung',
+        'created_at': FieldValue.serverTimestamp(),
+      });
 
-        if (!snapshot.exists) {
-          throw Exception('Data opname tidak ditemukan.');
-        }
+      if (!mounted) return;
 
-        if (snapshot.data()?['status'] != 'menunggu_persetujuan') {
-          throw Exception('Data sudah diproses sebelumnya.');
-        }
+      pesan(
+        context,
+        'Sesi inventarisasi berhasil dibuat.',
+      );
 
-        transaction.update(ref, {
-          'status': 'ditolak',
-          'approved_by': namaAdmin,
-          'approved_by_email': emailAdmin,
-          'approved_at': FieldValue.serverTimestamp(),
-          'catatan_admin': catatan,
-        });
+      namaCtrl.clear();
+      lokasiCtrl.clear();
+    } catch (e) {
+      if (mounted) {
+        pesan(
+          context,
+          'Gagal membuat sesi: $e',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => loading = false);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    namaCtrl.dispose();
+    lokasiCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Inventarisasi'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(18),
+        children: [
+          const Text(
+            'Buat Sesi Inventarisasi',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          TextField(
+            controller: namaCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Nama Inventarisasi',
+              prefixIcon: Icon(Icons.assignment),
+            ),
+          ),
+
+          const SizedBox(height: 15),
+
+          TextField(
+            controller: lokasiCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Lokasi',
+              prefixIcon: Icon(Icons.location_on),
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          tombolUtama(
+            teks: loading
+                ? 'Membuat...'
+                : 'Buat Sesi',
+            ikon: Icons.add,
+            aksi: loading ? null : buatSesi,
+          ),
+
+          const SizedBox(height: 30),
+
+          const Text(
+            'Sesi Inventarisasi',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          StreamBuilder<
+              QuerySnapshot<Map<String, dynamic>>>(
+            stream: db
+                .collection('inventarisasi')
+                .orderBy(
+                  'created_at',
+                  descending: true,
+                )
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return const Center(
+                  child: CircularProgressIndicator(),
+                );
+              }
+
+              final docs =
+                  snapshot.data!.docs;
+
+              if (docs.isEmpty) {
+                return const Card(
+                  child: Padding(
+                    padding: EdgeInsets.all(18),
+                    child: Text(
+                      'Belum ada sesi inventarisasi.',
+                    ),
+                  ),
+                );
+              }
+
+              return Column(
+                children: docs.map((doc) {
+                  final data = doc.data();
+
+                  return Card(
+                    child: ListTile(
+                      leading: const CircleAvatar(
+                        child: Icon(
+                          Icons.fact_check,
+                        ),
+                      ),
+                      title: Text(
+                        data['nama_sesi']
+                                ?.toString() ??
+                            '-',
+                      ),
+                      subtitle: Text(
+                        '${data['lokasi'] ?? '-'}\n'
+                        '${data['tanggal'] ?? '-'}\n'
+                        'Status: ${data['status'] ?? '-'}',
+                      ),
+                      isThreeLine: true,
+                    ),
+                  );
+                }).toList(),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =====================================================
+// INVENTARISASI PEGAWAI
+// =====================================================
+
+class HalamanInventarisasiPegawai
+    extends StatefulWidget {
+  final String pengguna;
+
+  const HalamanInventarisasiPegawai({
+    super.key,
+    required this.pengguna,
+  });
+
+  @override
+  State<HalamanInventarisasiPegawai> createState() =>
+      _HalamanInventarisasiPegawaiState();
+}
+
+class _HalamanInventarisasiPegawaiState
+    extends State<HalamanInventarisasiPegawai> {
+  final kodeCtrl = TextEditingController();
+  final lokasiAktualCtrl =
+      TextEditingController();
+  final catatanCtrl =
+      TextEditingController();
+
+  String kondisiAktual = 'Baik';
+  String hasil = 'Sesuai';
+  bool loading = false;
+
+  Future<void> simpanTemuan() async {
+    final kode = kodeCtrl.text.trim();
+
+    if (kode.isEmpty ||
+        lokasiAktualCtrl.text.trim().isEmpty) {
+      pesan(
+        context,
+        'Kode aset dan lokasi aktual wajib diisi.',
+      );
+      return;
+    }
+
+    setState(() => loading = true);
+
+    try {
+      final aset =
+          await db.collection('barang').doc(kode).get();
+
+      if (!aset.exists) {
+        pesan(
+          context,
+          'Kode aset tidak ditemukan.',
+        );
+        return;
+      }
+
+      final data = aset.data()!;
+
+      await db.collection('temuan_inventarisasi').add({
+        'kode_aset': kode,
+        'nama_aset':
+            data['nama_barang']?.toString() ?? '-',
+        'lokasi_sistem':
+            data['lokasi']?.toString() ?? '-',
+        'lokasi_aktual':
+            lokasiAktualCtrl.text.trim(),
+        'kondisi_sistem':
+            data['kondisi']?.toString() ?? '-',
+        'kondisi_aktual': kondisiAktual,
+        'hasil': hasil,
+        'catatan': catatanCtrl.text.trim(),
+        'petugas': widget.pengguna,
+        'tanggal': tanggalSekarang(),
+        'created_at':
+            FieldValue.serverTimestamp(),
+      });
+
+      await catatAudit(
+        aksi: 'CEK FISIK ASET',
+        kodeAset: kode,
+        namaAset:
+            data['nama_barang']?.toString() ?? '-',
+        pengguna: widget.pengguna,
+        keterangan:
+            'Hasil pemeriksaan: $hasil.',
+      );
+
+      if (!mounted) return;
+
+      pesan(
+        context,
+        'Hasil pemeriksaan berhasil disimpan.',
+      );
+
+      kodeCtrl.clear();
+      lokasiAktualCtrl.clear();
+      catatanCtrl.clear();
+    } catch (e) {
+      if (mounted) {
+        pesan(
+          context,
+          'Gagal menyimpan hasil: $e',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => loading = false);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    kodeCtrl.dispose();
+    lokasiAktualCtrl.dispose();
+    catatanCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Cek Fisik Aset'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(18),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.blue.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: const Text(
+              'Masukkan kode aset secara manual. '
+              'Tidak menggunakan scanner barcode.',
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          TextField(
+            controller: kodeCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Kode Aset',
+              hintText: 'Contoh AST-000001',
+              prefixIcon: Icon(Icons.inventory),
+            ),
+          ),
+
+          const SizedBox(height: 15),
+
+          TextField(
+            controller: lokasiAktualCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Lokasi Aktual',
+              prefixIcon: Icon(Icons.location_on),
+            ),
+          ),
+
+          const SizedBox(height: 15),
+
+          DropdownButtonFormField<String>(
+            value: kondisiAktual,
+            decoration: const InputDecoration(
+              labelText: 'Kondisi Fisik',
+              prefixIcon:
+                  Icon(Icons.health_and_safety),
+            ),
+            items: const [
+              DropdownMenuItem(
+                value: 'Baik',
+                child: Text('Baik'),
+              ),
+              DropdownMenuItem(
+                value: 'Rusak Ringan',
+                child: Text('Rusak Ringan'),
+              ),
+              DropdownMenuItem(
+                value: 'Rusak Berat',
+                child: Text('Rusak Berat'),
+              ),
+            ],
+            onChanged: (value) {
+              setState(() {
+                kondisiAktual =
+                    value ?? 'Baik';
+              });
+            },
+          ),
+
+          const SizedBox(height: 15),
+
+          DropdownButtonFormField<String>(
+            value: hasil,
+            decoration: const InputDecoration(
+              labelText: 'Hasil Pemeriksaan',
+              prefixIcon:
+                  Icon(Icons.fact_check),
+            ),
+            items: const [
+              DropdownMenuItem(
+                value: 'Sesuai',
+                child: Text('Sesuai'),
+              ),
+              DropdownMenuItem(
+                value: 'Selisih',
+                child: Text('Selisih'),
+              ),
+              DropdownMenuItem(
+                value: 'Tidak Ditemukan',
+                child: Text('Tidak Ditemukan'),
+              ),
+            ],
+            onChanged: (value) {
+              setState(() {
+                hasil =
+                    value ?? 'Sesuai';
+              });
+            },
+          ),
+
+          const SizedBox(height: 15),
+
+          TextField(
+            controller: catatanCtrl,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: 'Catatan Temuan',
+              prefixIcon: Icon(Icons.notes),
+            ),
+          ),
+
+          const SizedBox(height: 25),
+
+          tombolUtama(
+            teks: loading
+                ? 'Menyimpan...'
+                : 'Simpan Hasil Pemeriksaan',
+            ikon: Icons.save,
+            aksi:
+                loading ? null : simpanTemuan,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =====================================================
+// HASIL INVENTARISASI
+// =====================================================
+
+class HalamanHasilInventarisasi
+    extends StatelessWidget {
+  const HalamanHasilInventarisasi({
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Hasil Inventarisasi',
+        ),
+      ),
+      body: StreamBuilder<
+          QuerySnapshot<Map<String, dynamic>>>(
+        stream: db
+            .collection('temuan_inventarisasi')
+            .orderBy(
+              'created_at',
+              descending: true,
+            )
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(
+              child: Text(
+                'Gagal memuat hasil:\n${snapshot.error}',
+                textAlign: TextAlign.center,
+              ),
+            );
+          }
+
+          if (!snapshot.hasData) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+
+          final docs =
+              snapshot.data!.docs;
+
+          if (docs.isEmpty) {
+            return const Center(
+              child: Text(
+                'Belum ada hasil inventarisasi.',
+              ),
+            );
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(15),
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              final data =
+                  docs[index].data();
+
+              final hasil =
+                  data['hasil']?.toString() ??
+                      '-';
+
+              Color warna = Colors.green;
+
+              if (hasil == 'Selisih') {
+                warna = Colors.orange;
+              } else if (hasil ==
+                  'Tidak Ditemukan') {
+                warna = Colors.red;
+              }
+
+              return Card(
+                margin: const EdgeInsets.only(
+                  bottom: 10,
+                ),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor:
+                        warna.withOpacity(0.12),
+                    child: Icon(
+                      hasil == 'Sesuai'
+                          ? Icons.check
+                          : Icons.warning,
+                      color: warna,
+                    ),
+                  ),
+                  title: Text(
+                    data['nama_aset']
+                            ?.toString() ??
+                        '-',
+                    style: const TextStyle(
+                      fontWeight:
+                          FontWeight.bold,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${data['kode_aset'] ?? '-'}\n'
+                    'Lokasi: ${data['lokasi_aktual'] ?? '-'}\n'
+                    'Hasil: $hasil',
+                  ),
+                  isThreeLine: true,
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+// =====================================================
+// PERSUTUJUAN INVENTARISASI
+// =====================================================
+
+class HalamanPersetujuanInventarisasi
+    extends StatelessWidget {
+  const HalamanPersetujuanInventarisasi({
+    super.key,
+  });
+
+  Future<void> setujui(
+    BuildContext context,
+    String id,
+  ) async {
+    try {
+      await db
+          .collection('inventarisasi')
+          .doc(id)
+          .update({
+        'status': 'disetujui',
+        'disetujui_pada':
+            FieldValue.serverTimestamp(),
+      });
+
+      await db.collection('berita_acara').add({
+        'nomor':
+            'BA-INV-${DateTime.now().millisecondsSinceEpoch}',
+        'inventarisasi_id': id,
+        'tanggal': tanggalSekarang(),
+        'status': 'final',
+        'dibuat_otomatis': true,
+        'created_at':
+            FieldValue.serverTimestamp(),
       });
 
       if (context.mounted) {
-        pesan(context, 'Opname berhasil ditolak.');
+        pesan(
+          context,
+          'Inventarisasi disetujui dan berita acara dibuat.',
+        );
       }
     } catch (e) {
       if (context.mounted) {
-        pesan(context, 'Gagal menolak opname: $e');
+        pesan(
+          context,
+          'Gagal menyetujui: $e',
+        );
+      }
+    }
+  }
+
+  Future<void> tolak(
+    BuildContext context,
+    String id,
+  ) async {
+    final alasanCtrl =
+        TextEditingController();
+
+    final alasan =
+        await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text(
+            'Alasan Penolakan',
+          ),
+          content: TextField(
+            controller: alasanCtrl,
+            maxLines: 4,
+            decoration:
+                const InputDecoration(
+              hintText:
+                  'Masukkan alasan penolakan',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () =>
+                  Navigator.pop(context),
+              child:
+                  const Text('Batal'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(
+                  context,
+                  alasanCtrl.text.trim(),
+                );
+              },
+              child:
+                  const Text('Tolak'),
+            ),
+          ],
+        );
+      },
+    );
+
+    alasanCtrl.dispose();
+
+    if (alasan == null ||
+        alasan.isEmpty) {
+      return;
+    }
+
+    await db
+        .collection('inventarisasi')
+        .doc(id)
+        .update({
+      'status': 'ditolak',
+      'alasan_penolakan': alasan,
+      'ditolak_pada':
+          FieldValue.serverTimestamp(),
+    });
+
+    if (context.mounted) {
+      pesan(
+        context,
+        'Inventarisasi ditolak.',
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title:
+            const Text('Persetujuan Inventarisasi'),
+      ),
+      body: StreamBuilder<
+          QuerySnapshot<Map<String, dynamic>>>(
+        stream: db
+            .collection('inventarisasi')
+            .orderBy(
+              'created_at',
+              descending: true,
+            )
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(
+              child:
+                  CircularProgressIndicator(),
+            );
+          }
+
+          final docs =
+              snapshot.data!.docs;
+
+          if (docs.isEmpty) {
+            return const Center(
+              child: Text(
+                'Belum ada inventarisasi.',
+              ),
+            );
+          }
+
+          return ListView.builder(
+            padding:
+                const EdgeInsets.all(15),
+            itemCount: docs.length,
+            itemBuilder:
+                (context, index) {
+              final doc = docs[index];
+              final data =
+                  doc.data();
+
+              final status =
+                  data['status']
+                          ?.toString() ??
+                      '-';
+
+              return Card(
+                margin:
+                    const EdgeInsets.only(
+                  bottom: 12,
+                ),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.all(
+                    16,
+                  ),
+                  child: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment
+                            .start,
+                    children: [
+                      Text(
+                        data['nama_sesi']
+                                ?.toString() ??
+                            '-',
+                        style:
+                            const TextStyle(
+                          fontSize: 17,
+                          fontWeight:
+                              FontWeight
+                                  .bold,
+                        ),
+                      ),
+                      const SizedBox(
+                        height: 5,
+                      ),
+                      Text(
+                        'Lokasi: ${data['lokasi'] ?? '-'}',
+                      ),
+                      Text(
+                        'Tanggal: ${data['tanggal'] ?? '-'}',
+                      ),
+                      Text(
+                        'Status: $status',
+                      ),
+
+                      if (status ==
+                          'berlangsung') ...[
+                        const SizedBox(
+                          height: 15,
+                        ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child:
+                                  ElevatedButton(
+                                onPressed:
+                                    () =>
+                                        setujui(
+                                  context,
+                                  doc.id,
+                                ),
+                                child:
+                                    const Text(
+                                  'Setujui',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(
+                              width: 10,
+                            ),
+                            Expanded(
+                              child:
+                                  OutlinedButton(
+                                onPressed:
+                                    () =>
+                                        tolak(
+                                  context,
+                                  doc.id,
+                                ),
+                                child:
+                                    const Text(
+                                  'Tolak',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+// =====================================================
+// PENGHAPUSAN
+// =====================================================
+
+class HalamanFormPenghapusan
+    extends StatefulWidget {
+  final String pengguna;
+
+  const HalamanFormPenghapusan({
+    super.key,
+    required this.pengguna,
+  });
+
+  @override
+  State<HalamanFormPenghapusan> createState() =>
+      _HalamanFormPenghapusanState();
+}
+
+class _HalamanFormPenghapusanState
+    extends State<HalamanFormPenghapusan> {
+  final kodeCtrl =
+      TextEditingController();
+  final alasanCtrl =
+      TextEditingController();
+
+  bool loading = false;
+
+  Future<void> ajukan() async {
+    final kode =
+        kodeCtrl.text.trim();
+
+    final alasan =
+        alasanCtrl.text.trim();
+
+    if (kode.isEmpty ||
+        alasan.isEmpty) {
+      pesan(
+        context,
+        'Kode aset dan alasan wajib diisi.',
+      );
+      return;
+    }
+
+    setState(() => loading = true);
+
+    try {
+      final aset = await db
+          .collection('barang')
+          .doc(kode)
+          .get();
+
+      if (!aset.exists) {
+        pesan(
+          context,
+          'Aset tidak ditemukan.',
+        );
+        return;
+      }
+
+      final data =
+          aset.data()!;
+
+      await db
+          .collection('penghapusan_aset')
+          .add({
+        'kode_aset': kode,
+        'nama_aset':
+            data['nama_barang'] ??
+                '-',
+        'alasan': alasan,
+        'pengusul':
+            widget.pengguna,
+        'status':
+            'diajukan',
+        'created_at':
+            FieldValue.serverTimestamp(),
+      });
+
+      await db
+          .collection('barang')
+          .doc(kode)
+          .update({
+        'status_aset':
+            'diusulkan dihapus',
+        'updated_at':
+            FieldValue.serverTimestamp(),
+      });
+
+      await catatAudit(
+        aksi:
+            'MENGUSULKAN PENGHAPUSAN',
+        kodeAset: kode,
+        namaAset:
+            data['nama_barang']
+                    ?.toString() ??
+                '-',
+        pengguna:
+            widget.pengguna,
+        keterangan:
+            alasan,
+      );
+
+      if (!mounted) return;
+
+      pesan(
+        context,
+        'Usulan penghapusan berhasil dikirim.',
+      );
+
+      kodeCtrl.clear();
+      alasanCtrl.clear();
+    } catch (e) {
+      if (mounted) {
+        pesan(
+          context,
+          'Gagal mengajukan: $e',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(
+          () => loading = false,
+        );
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    kodeCtrl.dispose();
+    alasanCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title:
+            const Text('Usulan Penghapusan'),
+      ),
+      body: ListView(
+        padding:
+            const EdgeInsets.all(18),
+        children: [
+          TextField(
+            controller: kodeCtrl,
+            decoration:
+                const InputDecoration(
+              labelText:
+                  'Kode Aset',
+              prefixIcon:
+                  Icon(Icons.inventory),
+            ),
+          ),
+
+          const SizedBox(
+            height: 15,
+          ),
+
+          TextField(
+            controller:
+                alasanCtrl,
+            maxLines: 4,
+            decoration:
+                const InputDecoration(
+              labelText:
+                  'Alasan Penghapusan',
+              prefixIcon:
+                  Icon(Icons.notes),
+            ),
+          ),
+
+          const SizedBox(
+            height: 25,
+          ),
+
+          tombolUtama(
+            teks: loading
+                ? 'Mengirim...'
+                : 'Ajukan Penghapusan',
+            ikon: Icons.send,
+            aksi: loading
+                ? null
+                : ajukan,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =====================================================
+// LIST PENGHAPUSAN ADMIN
+// =====================================================
+
+class HalamanPenghapusan
+    extends StatelessWidget {
+  const HalamanPenghapusan({
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title:
+            const Text('Usulan Penghapusan'),
+      ),
+      body: StreamBuilder<
+          QuerySnapshot<Map<String, dynamic>>>(
+        stream: db
+            .collection(
+              'penghapusan_aset',
+            )
+            .orderBy(
+              'created_at',
+              descending: true,
+            )
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(
+              child:
+                  CircularProgressIndicator(),
+            );
+          }
+
+          final docs =
+              snapshot.data!.docs;
+
+          if (docs.isEmpty) {
+            return const Center(
+              child: Text(
+                'Belum ada usulan penghapusan.',
+              ),
+            );
+          }
+
+          return ListView.builder(
+            padding:
+                const EdgeInsets.all(15),
+            itemCount: docs.length,
+            itemBuilder:
+                (context, index) {
+              final data =
+                  docs[index].data();
+
+              return Card(
+                child: ListTile(
+                  leading:
+                      const CircleAvatar(
+                    child: Icon(
+                      Icons.delete_outline,
+                    ),
+                  ),
+                  title: Text(
+                    data['nama_aset']
+                            ?.toString() ??
+                        '-',
+                  ),
+                  subtitle:
+                      Text(
+                    '${data['kode_aset'] ?? '-'}\n'
+                    'Status: ${data['status'] ?? '-'}\n'
+                    'Alasan: ${data['alasan'] ?? '-'}',
+                  ),
+                  isThreeLine: true,
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+// =====================================================
+// PERSETUJUAN PENGHAPUSAN
+// =====================================================
+
+class HalamanPersetujuanPenghapusan
+    extends StatelessWidget {
+  const HalamanPersetujuanPenghapusan({
+    super.key,
+  });
+
+  Future<void> keputusan(
+    BuildContext context,
+    String id,
+    String kode,
+    String status,
+    String alasan,
+  ) async {
+    try {
+      await db
+          .collection(
+            'penghapusan_aset',
+          )
+          .doc(id)
+          .update({
+        'status': status,
+        'alasan_penolakan':
+            alasan,
+        'diputuskan_pada':
+            FieldValue.serverTimestamp(),
+      });
+
+      if (status == 'disetujui') {
+        await db
+            .collection('barang')
+            .doc(kode)
+            .update({
+          'status_aset':
+              'dihapus',
+          'updated_at':
+              FieldValue.serverTimestamp(),
+        });
+      } else {
+        await db
+            .collection('barang')
+            .doc(kode)
+            .update({
+          'status_aset':
+              'aktif',
+          'updated_at':
+              FieldValue.serverTimestamp(),
+        });
+      }
+
+      if (context.mounted) {
+        pesan(
+          context,
+          status == 'disetujui'
+              ? 'Penghapusan disetujui.'
+              : 'Penghapusan ditolak.',
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        pesan(
+          context,
+          'Gagal memproses: $e',
+        );
       }
     }
   }
@@ -1437,108 +3238,192 @@ class HalamanPersetujuanOpname extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Persetujuan Opname'),
+        title:
+            const Text(
+          'Persetujuan Penghapusan',
+        ),
       ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      body: StreamBuilder<
+          QuerySnapshot<Map<String, dynamic>>>(
         stream: db
-            .collection('opname')
-            .where('status', isEqualTo: 'menunggu_persetujuan')
+            .collection(
+              'penghapusan_aset',
+            )
+            .where(
+              'status',
+              isEqualTo: 'diajukan',
+            )
             .snapshots(),
         builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(
-              child: Text('Terjadi kesalahan: ${snapshot.error}'),
+          if (!snapshot.hasData) {
+            return const Center(
+              child:
+                  CircularProgressIndicator(),
             );
           }
 
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
+          final docs =
+              snapshot.data!.docs;
 
-          final dokumen = snapshot.data!.docs;
-
-          if (dokumen.isEmpty) {
+          if (docs.isEmpty) {
             return const Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.check_circle_outline,
-                    size: 65,
-                    color: Colors.green,
-                  ),
-                  SizedBox(height: 12),
-                  Text('Tidak ada opname yang menunggu persetujuan.'),
-                ],
+              child: Text(
+                'Tidak ada usulan yang menunggu persetujuan.',
               ),
             );
           }
 
           return ListView.builder(
-            padding: const EdgeInsets.all(15),
-            itemCount: dokumen.length,
-            itemBuilder: (context, index) {
-              final doc = dokumen[index];
-              final data = doc.data();
+            padding:
+                const EdgeInsets.all(15),
+            itemCount: docs.length,
+            itemBuilder:
+                (context, index) {
+              final doc =
+                  docs[index];
 
-              final stokSistem =
-                  (data['stok_sistem'] as num?)?.toInt() ?? 0;
-              final stokFisik =
-                  (data['stok_fisik'] as num?)?.toInt() ?? 0;
-              final selisih = stokFisik - stokSistem;
+              final data =
+                  doc.data();
 
               return Card(
-                margin: const EdgeInsets.only(bottom: 15),
+                margin:
+                    const EdgeInsets.only(
+                  bottom: 12,
+                ),
                 child: Padding(
-                  padding: const EdgeInsets.all(15),
+                  padding:
+                      const EdgeInsets.all(
+                    16,
+                  ),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment:
+                        CrossAxisAlignment
+                            .start,
                     children: [
                       Text(
-                        data['nama_barang']?.toString() ?? '-',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
+                        data['nama_aset']
+                                ?.toString() ??
+                            '-',
+                        style:
+                            const TextStyle(
+                          fontWeight:
+                              FontWeight.bold,
                           fontSize: 17,
                         ),
                       ),
-                      const SizedBox(height: 7),
-                      Text('Kode: ${data['kode_barang'] ?? '-'}'),
-                      Text('Petugas: ${data['petugas'] ?? '-'}'),
-                      Text('Stok Sistem: $stokSistem'),
-                      Text('Stok Fisik: $stokFisik'),
-                      Text(
-                        'Selisih: $selisih',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: selisih == 0 ? Colors.green : Colors.red,
-                        ),
+                      const SizedBox(
+                        height: 5,
                       ),
-                      const SizedBox(height: 15),
+                      Text(
+                        'Kode: ${data['kode_aset'] ?? '-'}',
+                      ),
+                      Text(
+                        'Alasan: ${data['alasan'] ?? '-'}',
+                      ),
+                      const SizedBox(
+                        height: 15,
+                      ),
                       Row(
                         children: [
                           Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () {
-                                tolakOpname(context, doc.id);
-                              },
-                              icon: const Icon(Icons.close),
-                              label: const Text('Tolak'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.red,
+                            child:
+                                ElevatedButton(
+                              onPressed:
+                                  () =>
+                                      keputusan(
+                                context,
+                                doc.id,
+                                data['kode_aset']
+                                        ?.toString() ??
+                                    '',
+                                'disetujui',
+                                '',
+                              ),
+                              child:
+                                  const Text(
+                                'Setujui',
                               ),
                             ),
                           ),
-                          const SizedBox(width: 10),
+                          const SizedBox(
+                            width: 10,
+                          ),
                           Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                setujuiOpname(context, doc.id, data);
+                            child:
+                                OutlinedButton(
+                              onPressed:
+                                  () async {
+                                final ctrl =
+                                    TextEditingController();
+
+                                final alasan =
+                                    await showDialog<
+                                        String>(
+                                  context:
+                                      context,
+                                  builder:
+                                      (context) {
+                                    return AlertDialog(
+                                      title:
+                                          const Text(
+                                        'Alasan Penolakan',
+                                      ),
+                                      content:
+                                          TextField(
+                                        controller:
+                                            ctrl,
+                                        maxLines:
+                                            3,
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed:
+                                              () =>
+                                                  Navigator.pop(
+                                            context,
+                                          ),
+                                          child:
+                                              const Text(
+                                            'Batal',
+                                          ),
+                                        ),
+                                        ElevatedButton(
+                                          onPressed:
+                                              () =>
+                                                  Navigator.pop(
+                                            context,
+                                            ctrl.text.trim(),
+                                          ),
+                                          child:
+                                              const Text(
+                                            'Tolak',
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+
+                                ctrl.dispose();
+
+                                if (alasan !=
+                                        null &&
+                                    alasan
+                                        .isNotEmpty) {
+                                  await keputusan(
+                                    context,
+                                    doc.id,
+                                    data['kode_aset']
+                                            ?.toString() ??
+                                        '',
+                                    'ditolak',
+                                    alasan,
+                                  );
+                                }
                               },
-                              icon: const Icon(Icons.check),
-                              label: const Text('Setujui'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                foregroundColor: Colors.white,
+                              child:
+                                  const Text(
+                                'Tolak',
                               ),
                             ),
                           ),
@@ -1557,161 +3442,117 @@ class HalamanPersetujuanOpname extends StatelessWidget {
 }
 
 // =====================================================
-// RIWAYAT OPNAME
+// BERITA ACARA
 // =====================================================
 
-class HalamanRiwayat extends StatelessWidget {
-  final String? emailPetugas;
-
-  const HalamanRiwayat({
+class HalamanBeritaAcara
+    extends StatelessWidget {
+  const HalamanBeritaAcara({
     super.key,
-    this.emailPetugas,
   });
-
-  Color warnaStatus(String status) {
-    switch (status) {
-      case 'disetujui':
-        return Colors.green;
-      case 'ditolak':
-        return Colors.red;
-      default:
-        return Colors.orange;
-    }
-  }
-
-  String namaStatus(String status) {
-    switch (status) {
-      case 'disetujui':
-        return 'Disetujui';
-      case 'ditolak':
-        return 'Ditolak';
-      case 'menunggu_persetujuan':
-        return 'Menunggu Persetujuan';
-      default:
-        return status.isEmpty ? 'Belum ada status' : status;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
-    Query<Map<String, dynamic>> query = db.collection('opname');
-
-    if (emailPetugas != null) {
-      query = query.where(
-        'email_petugas',
-        isEqualTo: emailPetugas,
-      );
-    }
-
-    query = query.orderBy(
-      'created_at',
-      descending: true,
-    );
-
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          emailPetugas == null
-              ? 'Seluruh Riwayat Opname'
-              : 'Riwayat Opname Saya',
-        ),
+        title:
+            const Text('Berita Acara'),
       ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: query.snapshots(),
+      body: StreamBuilder<
+          QuerySnapshot<Map<String, dynamic>>>(
+        stream: db
+            .collection(
+              'berita_acara',
+            )
+            .orderBy(
+              'created_at',
+              descending: true,
+            )
+            .snapshots(),
         builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(
-              child: Text('Terjadi kesalahan: ${snapshot.error}'),
+          if (!snapshot.hasData) {
+            return const Center(
+              child:
+                  CircularProgressIndicator(),
             );
           }
 
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
+          final docs =
+              snapshot.data!.docs;
 
-          final dokumen = snapshot.data!.docs;
-
-          if (dokumen.isEmpty) {
+          if (docs.isEmpty) {
             return const Center(
-              child: Text('Belum ada riwayat opname.'),
+              child: Text(
+                'Belum ada berita acara.',
+              ),
             );
           }
 
           return ListView.builder(
-            padding: const EdgeInsets.all(15),
-            itemCount: dokumen.length,
-            itemBuilder: (context, index) {
-              final data = dokumen[index].data();
-
-              final status =
-                  data['status']?.toString() ?? '';
-
-              final stokSistem = data['stok_sistem'] ?? 0;
-              final stokFisik = data['stok_fisik'] ?? 0;
-              final selisih = data['selisih'] ?? 0;
-
-              final waktu = data['created_at'];
-
-              String tanggal = '-';
-
-              if (waktu is Timestamp) {
-                tanggal = waktu.toDate().toLocal().toString();
-              }
+            padding:
+                const EdgeInsets.all(15),
+            itemCount: docs.length,
+            itemBuilder:
+                (context, index) {
+              final data =
+                  docs[index].data();
 
               return Card(
-                margin: const EdgeInsets.only(bottom: 13),
-                child: Padding(
-                  padding: const EdgeInsets.all(15),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        data['nama_barang']?.toString() ?? '-',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 7),
-                      Text('Kode: ${data['kode_barang'] ?? '-'}'),
-                      Text('Petugas: ${data['petugas'] ?? '-'}'),
-                      Text('Tanggal: $tanggal'),
-                      Text('Stok Sistem: $stokSistem'),
-                      Text('Stok Fisik: $stokFisik'),
-                      Text('Selisih: $selisih'),
-                      const SizedBox(height: 10),
-
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 7,
-                        ),
-                        decoration: BoxDecoration(
-                          color: warnaStatus(status).withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          namaStatus(status),
-                          style: TextStyle(
-                            color: warnaStatus(status),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-
-                      if (data['approved_by'] != null) ...[
-                        const SizedBox(height: 10),
-                        Text('Diproses oleh: ${data['approved_by']}'),
-                      ],
-
-                      if (data['catatan_admin'] != null) ...[
-                        const SizedBox(height: 5),
-                        Text(
-                          'Catatan: ${data['catatan_admin']}',
-                        ),
-                      ],
-                    ],
+                child: ListTile(
+                  leading:
+                      const CircleAvatar(
+                    child: Icon(
+                      Icons.description,
+                    ),
                   ),
+                  title: Text(
+                    data['nomor']
+                            ?.toString() ??
+                        '-',
+                  ),
+                  subtitle:
+                      Text(
+                    'Tanggal: ${data['tanggal'] ?? '-'}\n'
+                    'Status: ${data['status'] ?? '-'}',
+                  ),
+                  trailing:
+                      const Icon(
+                    Icons.visibility,
+                  ),
+                  onTap: () {
+                    showDialog(
+                      context:
+                          context,
+                      builder:
+                          (context) {
+                        return AlertDialog(
+                          title:
+                              const Text(
+                            'Berita Acara',
+                          ),
+                          content:
+                              Text(
+                            'Nomor: ${data['nomor'] ?? '-'}\n\n'
+                            'Tanggal: ${data['tanggal'] ?? '-'}\n\n'
+                            'Berita acara dibuat otomatis setelah hasil inventarisasi disetujui.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed:
+                                  () =>
+                                      Navigator.pop(
+                                context,
+                              ),
+                              child:
+                                  const Text(
+                                'Tutup',
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  },
                 ),
               );
             },
@@ -1723,72 +3564,238 @@ class HalamanRiwayat extends StatelessWidget {
 }
 
 // =====================================================
-// DASHBOARD KADIN
+// AUDIT TRAIL
 // =====================================================
 
-class HalamanKadin extends StatelessWidget {
-  final String nama;
-  final String email;
-
-  const HalamanKadin({
+class HalamanAuditTrail
+    extends StatelessWidget {
+  const HalamanAuditTrail({
     super.key,
-    required this.nama,
-    required this.email,
   });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dashboard Kadin'),
-        actions: [
-          IconButton(
-            onPressed: () => logout(context),
-            icon: const Icon(Icons.logout),
-          ),
-        ],
+        title:
+            const Text('Audit Trail'),
+      ),
+      body: StreamBuilder<
+          QuerySnapshot<Map<String, dynamic>>>(
+        stream: db
+            .collection(
+              'audit_trail',
+            )
+            .orderBy(
+              'waktu',
+              descending: true,
+            )
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(
+              child:
+                  CircularProgressIndicator(),
+            );
+          }
+
+          final docs =
+              snapshot.data!.docs;
+
+          if (docs.isEmpty) {
+            return const Center(
+              child: Text(
+                'Belum ada aktivitas.',
+              ),
+            );
+          }
+
+          return ListView.builder(
+            padding:
+                const EdgeInsets.all(15),
+            itemCount: docs.length,
+            itemBuilder:
+                (context, index) {
+              final data =
+                  docs[index].data();
+
+              return Card(
+                margin:
+                    const EdgeInsets.only(
+                  bottom: 10,
+                ),
+                child: ListTile(
+                  leading:
+                      const CircleAvatar(
+                    child:
+                        Icon(Icons.history),
+                  ),
+                  title: Text(
+                    data['aksi']
+                            ?.toString() ??
+                        '-',
+                    style:
+                        const TextStyle(
+                      fontWeight:
+                          FontWeight.bold,
+                    ),
+                  ),
+                  subtitle:
+                      Text(
+                    'Pengguna: ${data['pengguna'] ?? '-'}\n'
+                    'Kode: ${data['kode_aset'] ?? '-'}\n'
+                    '${data['keterangan'] ?? ''}',
+                  ),
+                  isThreeLine: true,
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+// =====================================================
+// EKSPOR DATA
+// =====================================================
+
+class HalamanEksporData
+    extends StatelessWidget {
+  const HalamanEksporData({
+    super.key,
+  });
+
+  Future<void> eksporAset(
+      BuildContext context) async {
+    try {
+      final snapshot =
+          await db.collection('barang').get();
+
+      final buffer =
+          StringBuffer();
+
+      buffer.writeln(
+        'kode_aset,nama_barang,kategori,lokasi,merk,tipe,tahun_perolehan,kondisi,status_aset,keterangan',
+      );
+
+      for (final doc
+          in snapshot.docs) {
+        final d = doc.data();
+
+        buffer.writeln(
+          [
+            d['kode_aset'],
+            d['nama_barang'],
+            d['kategori'],
+            d['lokasi'],
+            d['merk'],
+            d['tipe'],
+            d['tahun_perolehan'],
+            d['kondisi'],
+            d['status_aset'],
+            d['keterangan'],
+          ]
+              .map(
+                (e) => '"${e ?? ''}"',
+              )
+              .join(','),
+        );
+      }
+
+      final directory =
+          await getTemporaryDirectory();
+
+      final file = File(
+        '${directory.path}/data_aset_${DateTime.now().millisecondsSinceEpoch}.csv',
+      );
+
+      await file.writeAsString(
+        '\uFEFF${buffer.toString()}',
+        encoding: utf8,
+      );
+
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: 'Data Aset Inventaris',
+      );
+
+      if (context.mounted) {
+        pesan(
+          context,
+          'Data aset berhasil diekspor.',
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        pesan(
+          context,
+          'Gagal mengekspor: $e',
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title:
+            const Text('Ekspor Data'),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(18),
+        padding:
+            const EdgeInsets.all(18),
         children: [
-          Text(
-            'Selamat datang, $nama',
-            style: const TextStyle(
-              fontSize: 21,
-              fontWeight: FontWeight.bold,
-            ),
+          kartuMenu(
+            judul:
+                'Ekspor Daftar Aset',
+            deskripsi:
+                'Mengekspor seluruh data aset ke CSV yang dapat dibuka di Excel.',
+            ikon:
+                Icons.inventory_2,
+            warna:
+                Colors.blue,
+            aksi: () =>
+                eksporAset(context),
           ),
-          const SizedBox(height: 5),
-          const Text('Monitoring Stock Opname'),
-          const SizedBox(height: 25),
 
           kartuMenu(
-            context: context,
-            judul: 'Monitoring Stok Barang',
-            deskripsi: 'Melihat stok sistem seluruh barang.',
-            ikon: Icons.analytics,
-            warna: Colors.blue,
+            judul:
+                'Hasil Inventarisasi',
+            deskripsi:
+                'Melihat hasil pemeriksaan aset dan selisih.',
+            ikon:
+                Icons.fact_check,
+            warna:
+                Colors.green,
             aksi: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const HalamanMonitoringStok(),
+                  builder: (_) =>
+                      const HalamanHasilInventarisasi(),
                 ),
               );
             },
           ),
 
           kartuMenu(
-            context: context,
-            judul: 'Riwayat Opname',
-            deskripsi: 'Melihat seluruh hasil opname dan statusnya.',
-            ikon: Icons.history,
-            warna: Colors.green,
+            judul:
+                'Laporan Resmi',
+            deskripsi:
+                'Melihat rekap aset berdasarkan lokasi, kategori, dan kondisi.',
+            ikon:
+                Icons.assessment,
+            warna:
+                Colors.purple,
             aksi: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const HalamanRiwayat(),
+                  builder: (_) =>
+                      const HalamanLaporan(),
                 ),
               );
             },
@@ -1800,89 +3807,255 @@ class HalamanKadin extends StatelessWidget {
 }
 
 // =====================================================
-// MONITORING STOK
+// LAPORAN
 // =====================================================
 
-class HalamanMonitoringStok extends StatelessWidget {
-  const HalamanMonitoringStok({super.key});
+class HalamanLaporan
+    extends StatelessWidget {
+  const HalamanLaporan({
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Monitoring Stok Barang'),
+        title:
+            const Text('Laporan Resmi'),
       ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: db.collection('barang').orderBy('kode_barang').snapshots(),
+      body: StreamBuilder<
+          QuerySnapshot<Map<String, dynamic>>>(
+        stream: db
+            .collection('barang')
+            .snapshots(),
         builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(
-              child: Text('Terjadi kesalahan: ${snapshot.error}'),
-            );
-          }
-
           if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final dokumen = snapshot.data!.docs;
-
-          if (dokumen.isEmpty) {
             return const Center(
-              child: Text('Belum ada data barang.'),
+              child:
+                  CircularProgressIndicator(),
             );
           }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(15),
-            itemCount: dokumen.length,
-            itemBuilder: (context, index) {
-              final data = dokumen[index].data();
+          final docs =
+              snapshot.data!.docs;
 
-              final stok =
-                  (data['stok_sistem'] as num?)?.toInt() ?? 0;
+          int baik = 0;
+          int ringan = 0;
+          int berat = 0;
 
-              return Card(
-                margin: const EdgeInsets.only(bottom: 12),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.blue.withOpacity(0.12),
-                    child: const Icon(
-                      Icons.inventory,
-                      color: Colors.blue,
+          final lokasi =
+              <String, int>{};
+
+          final kategori =
+              <String, int>{};
+
+          for (final doc in docs) {
+            final d =
+                doc.data();
+
+            final kondisi =
+                d['kondisi']
+                        ?.toString() ??
+                    '-';
+
+            if (kondisi ==
+                'Baik') {
+              baik++;
+            } else if (kondisi ==
+                'Rusak Ringan') {
+              ringan++;
+            } else if (kondisi ==
+                'Rusak Berat') {
+              berat++;
+            }
+
+            final lok =
+                d['lokasi']
+                        ?.toString() ??
+                    '-';
+
+            final kat =
+                d['kategori']
+                        ?.toString() ??
+                    '-';
+
+            lokasi[lok] =
+                (lokasi[lok] ??
+                        0) +
+                    1;
+
+            kategori[kat] =
+                (kategori[kat] ??
+                        0) +
+                    1;
+          }
+
+          return ListView(
+            padding:
+                const EdgeInsets.all(
+              18,
+            ),
+            children: [
+              const Text(
+                'Rekap Aset',
+                style:
+                    TextStyle(
+                  fontSize: 21,
+                  fontWeight:
+                      FontWeight.bold,
+                ),
+              ),
+
+              const SizedBox(
+                height: 15,
+              ),
+
+              kartuStatistik(
+                judul:
+                    'Total Aset',
+                nilai:
+                    docs.length.toString(),
+                ikon:
+                    Icons.inventory_2,
+                warna:
+                    Colors.blue,
+              ),
+
+              const SizedBox(
+                height: 10,
+              ),
+
+              kartuStatistik(
+                judul:
+                    'Aset Kondisi Baik',
+                nilai:
+                    baik.toString(),
+                ikon:
+                    Icons.check_circle,
+                warna:
+                    Colors.green,
+              ),
+
+              const SizedBox(
+                height: 10,
+              ),
+
+              kartuStatistik(
+                judul:
+                    'Rusak Ringan',
+                nilai:
+                    ringan.toString(),
+                ikon:
+                    Icons.warning,
+                warna:
+                    Colors.orange,
+              ),
+
+              const SizedBox(
+                height: 10,
+              ),
+
+              kartuStatistik(
+                judul:
+                    'Rusak Berat',
+                nilai:
+                    berat.toString(),
+                ikon:
+                    Icons.dangerous,
+                warna:
+                    Colors.red,
+              ),
+
+              const SizedBox(
+                height: 25,
+              ),
+
+              const Text(
+                'Aset Berdasarkan Lokasi',
+                style:
+                    TextStyle(
+                  fontSize: 18,
+                  fontWeight:
+                      FontWeight.bold,
+                ),
+              ),
+
+              const SizedBox(
+                height: 10,
+              ),
+
+              ...lokasi.entries.map(
+                (entry) =>
+                    Card(
+                  child:
+                      ListTile(
+                    leading:
+                        const Icon(
+                      Icons.location_on,
                     ),
-                  ),
-                  title: Text(
-                    data['nama_barang']?.toString() ?? '-',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
+                    title:
+                        Text(
+                      entry.key,
                     ),
-                  ),
-                  subtitle: Text(
-                    'Kode: ${data['kode_barang'] ?? '-'}\n'
-                    'Kategori: ${data['kategori'] ?? '-'}',
-                  ),
-                  isThreeLine: true,
-                  trailing: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        '$stok',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue,
-                        ),
+                    trailing:
+                        Text(
+                      entry.value
+                          .toString(),
+                      style:
+                          const TextStyle(
+                        fontWeight:
+                            FontWeight.bold,
                       ),
-                      Text(
-                        data['satuan']?.toString() ?? '',
-                        style: const TextStyle(fontSize: 11),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-              );
-            },
+              ),
+
+              const SizedBox(
+                height: 20,
+              ),
+
+              const Text(
+                'Aset Berdasarkan Kategori',
+                style:
+                    TextStyle(
+                  fontSize: 18,
+                  fontWeight:
+                      FontWeight.bold,
+                ),
+              ),
+
+              const SizedBox(
+                height: 10,
+              ),
+
+              ...kategori.entries.map(
+                (entry) =>
+                    Card(
+                  child:
+                      ListTile(
+                    leading:
+                        const Icon(
+                      Icons.category,
+                    ),
+                    title:
+                        Text(
+                      entry.key,
+                    ),
+                    trailing:
+                        Text(
+                      entry.value
+                          .toString(),
+                      style:
+                          const TextStyle(
+                        fontWeight:
+                            FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           );
         },
       ),
