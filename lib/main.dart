@@ -17,7 +17,6 @@ Future<void> main() async {
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform, // Aktifkan jika menggunakan flutterfire configure
-    options: DefaultFirebaseOptions.currentPlatform,
   );
 
   runApp(const AplikasiInventaris());
