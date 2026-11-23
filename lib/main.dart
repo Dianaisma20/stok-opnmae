@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-=======
 import 'dart:convert';
 import 'dart:io';
 
@@ -11,8 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-
->>>>>>> e405c7fdebe8999fd8a19ed602e85dda901a3410
 import 'firebase_options.dart';
 import '../pages/halaman_login.dart';
 
@@ -22,11 +16,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(
-<<<<<<< HEAD
     options: DefaultFirebaseOptions.currentPlatform, // Aktifkan jika menggunakan flutterfire configure
-=======
     options: DefaultFirebaseOptions.currentPlatform,
->>>>>>> e405c7fdebe8999fd8a19ed602e85dda901a3410
   );
 
   runApp(const AplikasiInventaris());
@@ -83,8 +74,7 @@ void pesan(BuildContext context, String isi) {
       behavior: SnackBarBehavior.floating,
     ),
   );
-<<<<<<< HEAD
-=======
+
 }
 
 void logout(BuildContext context) {
@@ -4073,5 +4063,4 @@ class HalamanLaporan
       ),
     );
   }
->>>>>>> e405c7fdebe8999fd8a19ed602e85dda901a3410
 }
