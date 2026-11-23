@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:excel/excel.dart' as excel_pkg;
 
 import 'firebase_options.dart';
 
@@ -1815,7 +1816,7 @@ class _HalamanMutasiAsetState
 }
 
 // =====================================================
-// IMPOR DATA
+// IMPOR DATA EXCEL
 // =====================================================
 
 class HalamanImporData extends StatefulWidget {
@@ -1835,150 +1836,221 @@ class _HalamanImporDataState
     extends State<HalamanImporData> {
   bool loading = false;
 
-  Future<void> pilihFile() async {
-  try {
-    final hasil = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: [
-        'csv',
-        'txt',
-      ],
-      withData: true,
-    );
+  String _ambilTeksSpan(excel_pkg.TextSpan span) {
+    final buffer = StringBuffer();
 
-    if (hasil == null || hasil.files.isEmpty) {
-      return;
+    if (span.text != null) {
+      buffer.write(span.text);
     }
 
-    final file = hasil.files.single;
+    if (span.children != null) {
+      for (final child in span.children!) {
+        buffer.write(_ambilTeksSpan(child));
+      }
+    }
 
-    if (file.bytes == null) {
+    return buffer.toString();
+  }
+
+  String nilaiCell(dynamic cell) {
+    if (cell == null || cell.value == null) {
+      return '';
+    }
+
+    final value = cell.value;
+
+    if (value is excel_pkg.TextCellValue) {
+      return _ambilTeksSpan(value.value).trim();
+    }
+
+    if (value is excel_pkg.IntCellValue) {
+      return value.value.toString();
+    }
+
+    if (value is excel_pkg.DoubleCellValue) {
+      return value.value.toString();
+    }
+
+    if (value is excel_pkg.BoolCellValue) {
+      return value.value.toString();
+    }
+
+    if (value is excel_pkg.DateCellValue) {
+      return value.asDateTimeLocal().toString();
+    }
+
+    if (value is excel_pkg.DateTimeCellValue) {
+      return value.asDateTimeLocal().toString();
+    }
+
+    if (value is excel_pkg.TimeCellValue) {
+      return value.toString();
+    }
+
+    if (value is excel_pkg.FormulaCellValue) {
+      return value.toString();
+    }
+
+    return value.toString().trim();
+  }
+
+  Future<void> pilihFile() async {
+    try {
+      final hasil = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['xlsx'],
+        withData: true,
+        allowMultiple: false,
+      );
+
+      if (hasil == null || hasil.files.isEmpty) {
+        return;
+      }
+
+      final file = hasil.files.single;
+
+      if (file.bytes == null) {
+        if (mounted) {
+          pesan(
+            context,
+            'File Excel tidak dapat dibaca oleh aplikasi.',
+          );
+        }
+        return;
+      }
+
+      setState(() => loading = true);
+
+      await prosesExcel(file.bytes!);
+
       if (mounted) {
         pesan(
           context,
-          'File tidak dapat dibaca oleh aplikasi.',
+          'Data Excel berhasil diimpor ke database.',
         );
       }
-      return;
-    }
-
-    setState(() => loading = true);
-
-    // Membaca isi file langsung dari memory.
-    // Cara ini bisa digunakan di Chrome/Web.
-    final isi = utf8.decode(file.bytes!);
-
-    await prosesCSV(isi);
-
-    if (mounted) {
-      pesan(
-        context,
-        'Data berhasil diproses.',
-      );
-    }
-  } catch (e) {
-    if (mounted) {
-      pesan(
-        context,
-        'Gagal mengimpor data: $e',
-      );
-    }
-  } finally {
-    if (mounted) {
-      setState(() => loading = false);
+    } catch (e) {
+      if (mounted) {
+        pesan(
+          context,
+          'Gagal mengimpor Excel: $e',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => loading = false);
+      }
     }
   }
-}
 
-  Future<void> prosesCSV(String isi) async {
-    final lines = isi
-        .split('\n')
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
+  Future<void> prosesExcel(List<int> bytes) async {
+    final excel = excel_pkg.Excel.decodeBytes(bytes);
 
-    if (lines.length < 2) {
+    if (excel.tables.isEmpty) {
+      throw Exception('File Excel tidak memiliki sheet.');
+    }
+
+    final namaSheet = excel.tables.keys.first;
+    final sheet = excel.tables[namaSheet];
+
+    if (sheet == null || sheet.rows.isEmpty) {
+      throw Exception('Sheet Excel tidak memiliki data.');
+    }
+
+    final headerRow = sheet.rows.first;
+    final header = headerRow.map(nilaiCell).toList();
+
+    const headerWajib = [
+      'No',
+      'Kode Aset',
+      'Register Aset',
+      'Nama Aset',
+      'Kategori',
+      'Merek',
+      'Model',
+      'Serial Number',
+      'Tahun Perolehan',
+      'Kondisi',
+      'Nomor BAST',
+      'Tanggal BAST',
+      'Lokasi',
+      'Koordinat',
+      'Status',
+      'Keterangan',
+    ];
+
+    if (header.length < headerWajib.length) {
       throw Exception(
-        'File tidak memiliki data.',
+        'Format kolom Excel tidak sesuai. Gunakan file Master Aset.',
       );
     }
 
-    final header =
-        lines.first.split(',').map((e) => e.trim()).toList();
-
-    final indexKode =
-        header.indexOf('kode_aset');
-
-    final indexNama =
-        header.indexOf('nama_barang');
-
-    final indexKategori =
-        header.indexOf('kategori');
-
-    final indexLokasi =
-        header.indexOf('lokasi');
-
-    final indexMerk =
-        header.indexOf('merk');
-
-    final indexTipe =
-        header.indexOf('tipe');
-
-    final indexTahun =
-        header.indexOf('tahun_perolehan');
-
-    final indexKondisi =
-        header.indexOf('kondisi');
-
-    final indexKeterangan =
-        header.indexOf('keterangan');
-
-    if (indexKode == -1 ||
-        indexNama == -1 ||
-        indexKategori == -1 ||
-        indexLokasi == -1) {
-      throw Exception(
-        'Kolom wajib tidak lengkap. Gunakan format template yang disediakan.',
-      );
+    for (int i = 0; i < headerWajib.length; i++) {
+      if (header[i].trim() != headerWajib[i]) {
+        throw Exception(
+          'Kolom ke-${i + 1} harus "${headerWajib[i]}". '
+          'Kolom yang ditemukan: "${header[i]}".',
+        );
+      }
     }
 
     int berhasil = 0;
+    int dilewati = 0;
 
-    for (int i = 1; i < lines.length; i++) {
-      final row = lines[i]
-          .split(',')
-          .map((e) => e.trim())
-          .toList();
+    for (int i = 1; i < sheet.rows.length; i++) {
+      final row = sheet.rows[i];
 
-      String nilai(int index) {
-        if (index < 0 ||
-            index >= row.length) {
+      String ambil(int index) {
+        if (index < 0 || index >= row.length) {
           return '';
         }
-
-        return row[index];
+        return nilaiCell(row[index]);
       }
 
-      final kode = nilai(indexKode);
+      final no = ambil(0);
+      final kodeAset = ambil(1);
+      final registerAset = ambil(2);
+      final namaAset = ambil(3);
+      final kategori = ambil(4);
+      final merek = ambil(5);
+      final model = ambil(6);
+      final serialNumber = ambil(7);
+      final tahunPerolehan = ambil(8);
+      final kondisi = ambil(9);
+      final nomorBast = ambil(10);
+      final tanggalBast = ambil(11);
+      final lokasi = ambil(12);
+      final koordinat = ambil(13);
+      final status = ambil(14);
+      final keterangan = ambil(15);
 
-      if (kode.isEmpty) {
+      if (kodeAset.isEmpty && namaAset.isEmpty) {
+        dilewati++;
         continue;
       }
 
-      await db.collection('barang').doc(kode).set({
-        'kode_aset': kode,
-        'nama_barang': nilai(indexNama),
-        'kategori': nilai(indexKategori),
-        'lokasi': nilai(indexLokasi),
-        'merk': nilai(indexMerk),
-        'tipe': nilai(indexTipe),
-        'tahun_perolehan': nilai(indexTahun),
-        'kondisi':
-            nilai(indexKondisi).isEmpty
-                ? 'Baik'
-                : nilai(indexKondisi),
-        'keterangan': nilai(indexKeterangan),
-        'status_aset': 'aktif',
+      if (kodeAset.isEmpty) {
+        dilewati++;
+        continue;
+      }
+
+      await db.collection('barang').doc(kodeAset).set({
+        'no': no,
+        'kode_aset': kodeAset,
+        'register_aset': registerAset,
+        'nama_barang': namaAset,
+        'kategori': kategori,
+        'merk': merek,
+        'tipe': model,
+        'serial_number': serialNumber,
+        'tahun_perolehan': tahunPerolehan,
+        'kondisi': kondisi.isEmpty ? 'Baik' : kondisi,
+        'nomor_bast': nomorBast,
+        'tanggal_bast': tanggalBast,
+        'lokasi': lokasi,
+        'koordinat': koordinat,
+        'status_aset': status.isEmpty ? 'Aktif' : status,
+        'keterangan': keterangan,
         'updated_at': FieldValue.serverTimestamp(),
         'imported_by': widget.pengguna,
       });
@@ -1987,12 +2059,12 @@ class _HalamanImporDataState
     }
 
     await catatAudit(
-      aksi: 'IMPOR DATA ASET',
+      aksi: 'IMPOR DATA EXCEL',
       kodeAset: '-',
       namaAset: '-',
       pengguna: widget.pengguna,
       keterangan:
-          '$berhasil data aset diimpor.',
+          '$berhasil data aset berhasil diimpor. $dilewati data dilewati.',
     );
   }
 
@@ -2012,52 +2084,51 @@ class _HalamanImporDataState
               borderRadius: BorderRadius.circular(15),
             ),
             child: const Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
-                  Icons.info_outline,
+                  Icons.table_view,
                   color: Colors.orange,
                 ),
                 SizedBox(height: 10),
                 Text(
-                  'Format CSV yang digunakan:',
+                  'Format Excel yang digunakan:',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'kode_aset,nama_barang,kategori,lokasi,merk,tipe,tahun_perolehan,kondisi,keterangan',
+                  'No | Kode Aset | Register Aset | Nama Aset | '
+                  'Kategori | Merek | Model | Serial Number | '
+                  'Tahun Perolehan | Kondisi | Nomor BAST | '
+                  'Tanggal BAST | Lokasi | Koordinat | Status | Keterangan',
+                ),
+                SizedBox(height: 10),
+                Text(
+                  'Pilih file Master Aset (.xlsx). Semua baris data akan '
+                  'dimasukkan ke collection barang di Firestore.',
                 ),
               ],
             ),
           ),
-
           const SizedBox(height: 25),
-
           tombolUtama(
-            teks: loading
-                ? 'Mengimpor...'
-                : 'Pilih File CSV',
+            teks: loading ? 'Mengimpor Excel...' : 'Pilih File Excel',
             ikon: Icons.upload_file,
             aksi: loading ? null : pilihFile,
           ),
-
           const SizedBox(height: 20),
-
           const Text(
             'Catatan',
             style: TextStyle(
               fontWeight: FontWeight.bold,
             ),
           ),
-
           const SizedBox(height: 8),
-
           const Text(
-            'File dari Excel dapat disimpan sebagai CSV UTF-8 '
-            'kemudian diimpor ke sistem.',
+            'Jangan mengubah nama 16 kolom pada baris pertama Excel. '
+            'Isi data pada baris di bawahnya, lalu impor file tersebut.',
           ),
         ],
       ),
