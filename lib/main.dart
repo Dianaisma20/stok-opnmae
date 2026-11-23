@@ -1836,49 +1836,59 @@ class _HalamanImporDataState
   bool loading = false;
 
   Future<void> pilihFile() async {
-    try {
-      final hasil =
-          await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: [
-          'csv',
-          'txt',
-        ],
+  try {
+    final hasil = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: [
+        'csv',
+        'txt',
+      ],
+      withData: true,
+    );
+
+    if (hasil == null || hasil.files.isEmpty) {
+      return;
+    }
+
+    final file = hasil.files.single;
+
+    if (file.bytes == null) {
+      if (mounted) {
+        pesan(
+          context,
+          'File tidak dapat dibaca oleh aplikasi.',
+        );
+      }
+      return;
+    }
+
+    setState(() => loading = true);
+
+    // Membaca isi file langsung dari memory.
+    // Cara ini bisa digunakan di Chrome/Web.
+    final isi = utf8.decode(file.bytes!);
+
+    await prosesCSV(isi);
+
+    if (mounted) {
+      pesan(
+        context,
+        'Data berhasil diproses.',
       );
-
-      if (hasil == null ||
-          hasil.files.single.path == null) {
-        return;
-      }
-
-      setState(() => loading = true);
-
-      final file =
-          File(hasil.files.single.path!);
-
-      final isi = await file.readAsString();
-
-      await prosesCSV(isi);
-
-      if (mounted) {
-        pesan(
-          context,
-          'Data berhasil diproses.',
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        pesan(
-          context,
-          'Gagal mengimpor data: $e',
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => loading = false);
-      }
+    }
+  } catch (e) {
+    if (mounted) {
+      pesan(
+        context,
+        'Gagal mengimpor data: $e',
+      );
+    }
+  } finally {
+    if (mounted) {
+      setState(() => loading = false);
     }
   }
+}
 
   Future<void> prosesCSV(String isi) async {
     final lines = isi
