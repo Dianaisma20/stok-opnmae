@@ -39,8 +39,9 @@ class AplikasiInventaris extends StatelessWidget {
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xff1565c0),
+          brightness: Brightness.dark,
         ),
-        scaffoldBackgroundColor: const Color(0xfff5f7fb),
+        scaffoldBackgroundColor: const Color.fromARGB(255, 0, 0, 0),
         appBarTheme: const AppBarTheme(
           backgroundColor: Color(0xff1565c0),
           foregroundColor: Colors.white,
